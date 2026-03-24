@@ -137,12 +137,21 @@ export default function DashboardScreen() {
           <View style={styles.actionsGrid}>
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => router.push('/create-estimate')}
+              onPress={() => router.push('/smart-estimate')}
             >
               <View style={[styles.actionIcon, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                <Ionicons name="add-circle" size={28} color="#f59e0b" />
+                <Ionicons name="sparkles" size={28} color="#f59e0b" />
               </View>
-              <Text style={styles.actionText}>New Estimate</Text>
+              <Text style={styles.actionText}>Smart Estimate</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => router.push('/create-estimate')}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                <Ionicons name="add-circle" size={28} color="#10b981" />
+              </View>
+              <Text style={styles.actionText}>Manual Estimate</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionCard}
@@ -157,19 +166,10 @@ export default function DashboardScreen() {
               style={styles.actionCard}
               onPress={() => router.push('/materials')}
             >
-              <View style={[styles.actionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                <Ionicons name="pricetags" size={28} color="#10b981" />
+              <View style={[styles.actionIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+                <Ionicons name="pricetags" size={28} color="#8b5cf6" />
               </View>
               <Text style={styles.actionText}>Material Prices</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => router.push('/(tabs)/jobs')}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-                <Ionicons name="briefcase" size={28} color="#8b5cf6" />
-              </View>
-              <Text style={styles.actionText}>Job Board</Text>
             </TouchableOpacity>
           </View>
         </View>

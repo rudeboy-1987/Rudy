@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { estimatesApi, aiApi, Estimate } from '../../src/services/api';
+import { estimatesApi, aiApi, Estimate, emailApi } from '../../src/services/api';
 import { format } from 'date-fns';
 
 export default function EstimateDetailScreen() {
@@ -62,8 +62,11 @@ export default function EstimateDetailScreen() {
     }
     setSending(true);
     try {
-      await estimatesApi.send(estimate.id, estimate.client_email);
-      Alert.alert('Success', `Estimate sent to ${estimate.client_email} [MOCKED]`, [
+      const response = await emailApi.sendEstimate(estimate.id, estimate.client_email);
+      const message = response.data.mocked 
+        ? `${response.data.message}` 
+        : `Estimate sent successfully to ${estimate.client_email}`;
+      Alert.alert('Success', message, [
         { text: 'OK', onPress: () => loadEstimate() },
       ]);
     } catch (error) {

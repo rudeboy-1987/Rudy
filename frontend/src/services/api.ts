@@ -110,6 +110,22 @@ export const aiApi = {
     api.post('/ai/analyze-blueprint', { blueprint_base64, project_description, project_type }),
   generateEstimate: (estimate_id: string) =>
     api.post(`/ai/generate-estimate?estimate_id=${estimate_id}`),
+  analyzeProject: (project_description: string, project_type: string, client_name?: string, address?: string) =>
+    api.post('/ai/analyze-project', { project_description, project_type, client_name, address }),
+};
+
+// Payments API
+export const paymentsApi = {
+  createCheckout: (tier: string, origin_url: string) =>
+    api.post('/payments/checkout', { tier, origin_url }),
+  getPaymentStatus: (session_id: string) =>
+    api.get(`/payments/status/${session_id}`),
+};
+
+// Email API (updated)
+export const emailApi = {
+  sendEstimate: (estimate_id: string, recipient_email: string, message?: string) =>
+    api.post(`/estimates/${estimate_id}/email`, { estimate_id, recipient_email, message }),
 };
 
 // Materials API

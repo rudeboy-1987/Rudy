@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -13,7 +13,17 @@ import bcrypt
 import jwt
 from datetime import datetime, timedelta
 import base64
+import json
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+
+# Optional: SendGrid for emails (if API key is provided)
+try:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+    SENDGRID_AVAILABLE = True
+except ImportError:
+    SENDGRID_AVAILABLE = False
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -182,6 +192,33 @@ class SendEstimateRequest(BaseModel):
     estimate_id: str
     recipient_email: str
     message: Optional[str] = None
+
+# ===================== NEW MODELS FOR PAYMENTS & AI ANALYZER =====================
+
+class ProjectAnalyzerRequest(BaseModel):
+    """Request for AI to analyze project description and generate estimate breakdown"""
+    project_description: str
+    project_type: str  # residential, commercial
+    client_name: Optional[str] = None
+    address: Optional[str] = None
+
+class ProjectAnalyzerResponse(BaseModel):
+    """AI-generated estimate breakdown from project description"""
+    project_name: str
+    materials: List[Dict[str, Any]]
+    labor: List[Dict[str, Any]]
+    equipment: List[Dict[str, Any]]
+    summary: str
+    estimated_total: float
+
+class SubscriptionCheckoutRequest(BaseModel):
+    """Request to create Stripe checkout for subscription"""
+    tier: str  # basic, premium
+    origin_url: str
+
+class PaymentStatusRequest(BaseModel):
+    """Request to check payment status"""
+    session_id: str
 
 # ===================== HELPER FUNCTIONS =====================
 
@@ -572,7 +609,405 @@ Make it professional and ready to send to a client."""
         logger.error(f"AI estimate generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
 
+# ===================== AI PROJECT ANALYZER - Natural Language to Estimate =====================
+
+@api_router.post("/ai/analyze-project")
+async def analyze_project_description(request: ProjectAnalyzerRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Analyze a natural language project description and generate a detailed estimate breakdown.
+    User describes what they need in plain English, AI breaks it down into materials, labor, and equipment.
+    """
+    try:
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="AI service not configured")
+        
+        # Fetch current material prices from database for accurate pricing
+        material_prices = await db.material_prices.find({}).to_list(100)
+        price_reference = "\n".join([f"- {m['name']}: ${m['price']}/{m['unit']}" for m in material_prices])
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"project-analyzer-{current_user['id']}-{uuid.uuid4()}",
+            system_message=f"""You are an expert electrical estimator AI. Your job is to analyze project descriptions 
+            and break them down into detailed estimates with materials, labor, and equipment.
+
+            CURRENT MATERIAL PRICES (use these for accuracy):
+            {price_reference}
+            
+            For labor, use standard rates:
+            - Journeyman electrician: $75/hour
+            - Apprentice: $45/hour
+            - Master electrician: $95/hour
+            
+            When analyzing a project:
+            1. Identify all required materials with quantities
+            2. Estimate labor hours by task
+            3. List any equipment rentals needed
+            4. Be thorough but realistic
+            
+            RESPOND ONLY WITH VALID JSON in this exact format:
+            {{
+                "project_name": "Brief descriptive name",
+                "materials": [
+                    {{"name": "Material name", "unit": "unit type", "quantity": number, "unit_price": number, "total": number}}
+                ],
+                "labor": [
+                    {{"description": "Task description", "hours": number, "rate": number, "total": number}}
+                ],
+                "equipment": [
+                    {{"name": "Equipment name", "days": number, "daily_rate": number, "total": number}}
+                ],
+                "summary": "Brief summary of the work",
+                "estimated_total": number
+            }}"""
+        ).with_model("openai", "gpt-4o")
+        
+        prompt = f"""Analyze this {request.project_type} electrical project and create a detailed estimate breakdown:
+
+PROJECT DESCRIPTION:
+{request.project_description}
+
+Create a comprehensive estimate with all materials, labor, and equipment needed. 
+Be specific about quantities and use realistic pricing.
+Respond ONLY with the JSON format specified."""
+
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        
+        # Try to parse the JSON response
+        try:
+            # Clean up the response in case it has markdown code blocks
+            clean_response = response.strip()
+            if clean_response.startswith("```json"):
+                clean_response = clean_response[7:]
+            if clean_response.startswith("```"):
+                clean_response = clean_response[3:]
+            if clean_response.endswith("```"):
+                clean_response = clean_response[:-3]
+            clean_response = clean_response.strip()
+            
+            estimate_data = json.loads(clean_response)
+            
+            # Calculate totals if not provided
+            materials_total = sum(m.get('total', m.get('quantity', 0) * m.get('unit_price', 0)) for m in estimate_data.get('materials', []))
+            labor_total = sum(l.get('total', l.get('hours', 0) * l.get('rate', 0)) for l in estimate_data.get('labor', []))
+            equipment_total = sum(e.get('total', e.get('days', 0) * e.get('daily_rate', 0)) for e in estimate_data.get('equipment', []))
+            
+            # Add overhead and profit
+            subtotal = materials_total + labor_total + equipment_total
+            overhead = subtotal * 0.10
+            profit = (subtotal + overhead) * 0.15
+            grand_total = subtotal + overhead + profit
+            
+            return {
+                "success": True,
+                "project_name": estimate_data.get('project_name', 'Electrical Project'),
+                "materials": estimate_data.get('materials', []),
+                "labor": estimate_data.get('labor', []),
+                "equipment": estimate_data.get('equipment', []),
+                "summary": estimate_data.get('summary', ''),
+                "totals": {
+                    "materials": round(materials_total, 2),
+                    "labor": round(labor_total, 2),
+                    "equipment": round(equipment_total, 2),
+                    "subtotal": round(subtotal, 2),
+                    "overhead": round(overhead, 2),
+                    "profit": round(profit, 2),
+                    "grand_total": round(grand_total, 2)
+                },
+                "client_name": request.client_name,
+                "address": request.address,
+                "project_type": request.project_type
+            }
+        except json.JSONDecodeError:
+            # Return the raw AI analysis if JSON parsing fails
+            return {
+                "success": False,
+                "raw_analysis": response,
+                "message": "AI provided analysis but couldn't generate structured data. Please review the analysis."
+            }
+            
+    except Exception as e:
+        logger.error(f"AI project analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+
+# ===================== STRIPE PAYMENT ENDPOINTS =====================
+
+@api_router.post("/payments/checkout")
+async def create_checkout_session(request: SubscriptionCheckoutRequest, http_request: Request, current_user: dict = Depends(get_current_user)):
+    """Create a Stripe checkout session for subscription payment"""
+    try:
+        stripe_api_key = os.environ.get('STRIPE_API_KEY')
+        if not stripe_api_key or stripe_api_key == 'sk_test_emergent':
+            # Return mocked response if no real Stripe key
+            return {
+                "success": False,
+                "mocked": True,
+                "message": "Stripe API key not configured. Add your STRIPE_API_KEY to .env to enable real payments.",
+                "tier": request.tier,
+                "price": SUBSCRIPTION_PACKAGES.get(request.tier, {}).get('price', 0)
+            }
+        
+        if request.tier not in SUBSCRIPTION_PACKAGES:
+            raise HTTPException(status_code=400, detail="Invalid subscription tier")
+        
+        package = SUBSCRIPTION_PACKAGES[request.tier]
+        
+        # Build URLs from frontend origin
+        success_url = f"{request.origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{request.origin_url}/(tabs)/profile"
+        
+        # Create webhook URL
+        host_url = str(http_request.base_url).rstrip('/')
+        webhook_url = f"{host_url}/api/webhook/stripe"
+        
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+        
+        checkout_request = CheckoutSessionRequest(
+            amount=package['price'],
+            currency="usd",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "user_id": current_user["id"],
+                "tier": request.tier,
+                "user_email": current_user["email"]
+            }
+        )
+        
+        session = await stripe_checkout.create_checkout_session(checkout_request)
+        
+        # Create payment transaction record
+        transaction = {
+            "id": str(uuid.uuid4()),
+            "session_id": session.session_id,
+            "user_id": current_user["id"],
+            "user_email": current_user["email"],
+            "tier": request.tier,
+            "amount": package['price'],
+            "currency": "usd",
+            "status": "initiated",
+            "payment_status": "pending",
+            "created_at": datetime.utcnow()
+        }
+        await db.payment_transactions.insert_one(transaction)
+        
+        return {
+            "success": True,
+            "checkout_url": session.url,
+            "session_id": session.session_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Stripe checkout error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Payment processing failed: {str(e)}")
+
+@api_router.get("/payments/status/{session_id}")
+async def get_payment_status(session_id: str, current_user: dict = Depends(get_current_user)):
+    """Check the status of a payment session"""
+    try:
+        stripe_api_key = os.environ.get('STRIPE_API_KEY')
+        if not stripe_api_key or stripe_api_key == 'sk_test_emergent':
+            return {"success": False, "mocked": True, "message": "Stripe not configured"}
+        
+        # Check if already processed
+        transaction = await db.payment_transactions.find_one({"session_id": session_id})
+        if transaction and transaction.get("payment_status") == "paid":
+            return {
+                "success": True,
+                "status": "complete",
+                "payment_status": "paid",
+                "tier": transaction.get("tier"),
+                "message": "Payment already processed"
+            }
+        
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
+        checkout_status = await stripe_checkout.get_checkout_status(session_id)
+        
+        # Update transaction record
+        if checkout_status.payment_status == "paid":
+            # Update user subscription
+            tier = checkout_status.metadata.get("tier", "basic")
+            user_id = checkout_status.metadata.get("user_id")
+            
+            if user_id:
+                await db.users.update_one(
+                    {"id": user_id},
+                    {"$set": {"subscription_tier": tier, "subscription_start": datetime.utcnow()}}
+                )
+            
+            # Update transaction
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {"status": "complete", "payment_status": "paid", "updated_at": datetime.utcnow()}}
+            )
+        elif checkout_status.status == "expired":
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {"status": "expired", "payment_status": "failed", "updated_at": datetime.utcnow()}}
+            )
+        
+        return {
+            "success": True,
+            "status": checkout_status.status,
+            "payment_status": checkout_status.payment_status,
+            "amount": checkout_status.amount_total / 100,  # Convert from cents
+            "currency": checkout_status.currency,
+            "tier": checkout_status.metadata.get("tier")
+        }
+        
+    except Exception as e:
+        logger.error(f"Payment status check error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to check payment status: {str(e)}")
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    try:
+        stripe_api_key = os.environ.get('STRIPE_API_KEY')
+        if not stripe_api_key or stripe_api_key == 'sk_test_emergent':
+            return {"received": True, "mocked": True}
+        
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature")
+        
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        if webhook_response.payment_status == "paid":
+            # Update user subscription
+            user_id = webhook_response.metadata.get("user_id")
+            tier = webhook_response.metadata.get("tier", "basic")
+            
+            if user_id:
+                await db.users.update_one(
+                    {"id": user_id},
+                    {"$set": {"subscription_tier": tier, "subscription_start": datetime.utcnow()}}
+                )
+                
+                await db.payment_transactions.update_one(
+                    {"session_id": webhook_response.session_id},
+                    {"$set": {"status": "complete", "payment_status": "paid", "updated_at": datetime.utcnow()}}
+                )
+        
+        return {"received": True}
+        
+    except Exception as e:
+        logger.error(f"Stripe webhook error: {str(e)}")
+        return {"received": True, "error": str(e)}
+
+# ===================== SENDGRID EMAIL ENDPOINTS =====================
+
+@api_router.post("/estimates/{estimate_id}/email")
+async def email_estimate(estimate_id: str, request: SendEstimateRequest, current_user: dict = Depends(get_current_user)):
+    """Send estimate via email using SendGrid"""
+    try:
+        estimate = await db.estimates.find_one({"id": estimate_id, "user_id": current_user["id"]})
+        if not estimate:
+            raise HTTPException(status_code=404, detail="Estimate not found")
+        
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        sender_email = os.environ.get('SENDER_EMAIL', 'noreply@estimatepro.com')
+        
+        if not sendgrid_api_key or not SENDGRID_AVAILABLE:
+            # Update status but return mocked response
+            await db.estimates.update_one(
+                {"id": estimate_id},
+                {"$set": {"status": "sent", "updated_at": datetime.utcnow()}}
+            )
+            return {
+                "success": False,
+                "mocked": True,
+                "message": f"[MOCKED] Email would be sent to {request.recipient_email}. Add SENDGRID_API_KEY to .env to enable real emails.",
+                "estimate_id": estimate_id
+            }
+        
+        # Build HTML email content
+        materials_html = "".join([
+            f"<tr><td>{m.get('name')}</td><td>{m.get('quantity')} {m.get('unit')}</td><td>${m.get('unit_price')}</td><td>${m.get('total')}</td></tr>"
+            for m in estimate.get('materials', [])
+        ])
+        
+        labor_html = "".join([
+            f"<tr><td>{l.get('description')}</td><td>{l.get('hours')} hrs</td><td>${l.get('rate')}/hr</td><td>${l.get('total')}</td></tr>"
+            for l in estimate.get('labor', [])
+        ])
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+            <div style="background: #f59e0b; color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+                <h1 style="margin: 0;">Electrical Estimate</h1>
+                <p style="margin: 5px 0 0 0;">{estimate.get('project_name')}</p>
+            </div>
+            
+            <div style="background: #f5f5f5; padding: 20px; border: 1px solid #ddd;">
+                <h2>Project Details</h2>
+                <p><strong>Client:</strong> {estimate.get('client_name')}</p>
+                <p><strong>Address:</strong> {estimate.get('address', 'Not specified')}</p>
+                <p><strong>Type:</strong> {estimate.get('project_type', '').title()}</p>
+                <p><strong>Description:</strong> {estimate.get('description', 'No description provided')}</p>
+                
+                {f"<h2>Materials</h2><table style='width:100%; border-collapse: collapse;'><tr style='background:#ddd;'><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>{materials_html}</table>" if materials_html else ""}
+                
+                {f"<h2>Labor</h2><table style='width:100%; border-collapse: collapse;'><tr style='background:#ddd;'><th>Description</th><th>Hours</th><th>Rate</th><th>Total</th></tr>{labor_html}</table>" if labor_html else ""}
+                
+                <div style="background: #1f2937; color: white; padding: 20px; margin-top: 20px; border-radius: 10px;">
+                    <h2 style="margin-top: 0;">Cost Summary</h2>
+                    <p>Materials: ${estimate.get('materials_total', 0):.2f}</p>
+                    <p>Labor: ${estimate.get('labor_total', 0):.2f}</p>
+                    <p>Equipment: ${estimate.get('equipment_total', 0):.2f}</p>
+                    <p>Overhead ({estimate.get('overhead_percentage', 10)}%): ${estimate.get('overhead_amount', 0):.2f}</p>
+                    <p>Profit ({estimate.get('profit_percentage', 15)}%): ${estimate.get('profit_amount', 0):.2f}</p>
+                    <hr style="border-color: #f59e0b;">
+                    <h2 style="color: #f59e0b;">Grand Total: ${estimate.get('grand_total', 0):,.2f}</h2>
+                </div>
+                
+                {f"<div style='margin-top: 20px; padding: 15px; background: white; border-radius: 10px;'><p><strong>Message from contractor:</strong></p><p>{request.message}</p></div>" if request.message else ""}
+                
+                <p style="margin-top: 20px; color: #666; font-size: 12px;">
+                    This estimate was sent by {current_user.get('company_name')} via EstimatePro.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        message = Mail(
+            from_email=sender_email,
+            to_emails=request.recipient_email,
+            subject=f"Electrical Estimate: {estimate.get('project_name')} - ${estimate.get('grand_total', 0):,.2f}",
+            html_content=html_content
+        )
+        
+        sg = SendGridAPIClient(sendgrid_api_key)
+        response = sg.send(message)
+        
+        if response.status_code == 202:
+            await db.estimates.update_one(
+                {"id": estimate_id},
+                {"$set": {"status": "sent", "updated_at": datetime.utcnow()}}
+            )
+            return {
+                "success": True,
+                "message": f"Estimate sent successfully to {request.recipient_email}",
+                "estimate_id": estimate_id
+            }
+        else:
+            raise Exception(f"SendGrid returned status {response.status_code}")
+            
+    except Exception as e:
+        logger.error(f"Email sending error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
 # ===================== MATERIAL PRICES ENDPOINTS =====================
+
+# Subscription pricing (defined server-side for security)
+SUBSCRIPTION_PACKAGES = {
+    "basic": {"price": 4.99, "name": "Basic Plan", "features": ["Unlimited estimates", "Email estimates", "AI assistance"]},
+    "premium": {"price": 19.99, "name": "Premium Plan", "features": ["All Basic features", "Job board access", "Priority support"]}
+}
 
 @api_router.get("/materials/prices")
 async def get_material_prices(category: Optional[str] = None):
