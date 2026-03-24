@@ -690,9 +690,18 @@ Respond ONLY with the JSON format specified."""
             estimate_data = json.loads(clean_response)
             
             # Calculate totals if not provided
-            materials_total = sum(m.get('total', m.get('quantity', 0) * m.get('unit_price', 0)) for m in estimate_data.get('materials', []))
-            labor_total = sum(l.get('total', l.get('hours', 0) * l.get('rate', 0)) for l in estimate_data.get('labor', []))
-            equipment_total = sum(e.get('total', e.get('days', 0) * e.get('daily_rate', 0)) for e in estimate_data.get('equipment', []))
+            materials_total = sum(
+                m.get('total', 0) if isinstance(m.get('total'), (int, float)) else m.get('quantity', 0) * m.get('unit_price', 0)
+                for m in estimate_data.get('materials', [])
+            )
+            labor_total = sum(
+                l.get('total', 0) if isinstance(l.get('total'), (int, float)) else l.get('hours', 0) * l.get('rate', 0)
+                for l in estimate_data.get('labor', [])
+            )
+            equipment_total = sum(
+                e.get('total', 0) if isinstance(e.get('total'), (int, float)) else e.get('days', 0) * e.get('daily_rate', 0)
+                for e in estimate_data.get('equipment', [])
+            )
             
             # Add overhead and profit
             subtotal = materials_total + labor_total + equipment_total

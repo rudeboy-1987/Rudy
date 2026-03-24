@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,28 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { aiApi, estimatesApi } from '../src/services/api';
 
+interface MaterialItem {
+  name: string;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+}
+
+interface LaborItem {
+  description: string;
+  hours: number;
+  rate: number;
+  total: number;
+}
+
+interface EquipmentItem {
+  name: string;
+  days: number;
+  daily_rate: number;
+  total: number;
+}
+
 export default function SmartEstimateScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -27,8 +49,37 @@ export default function SmartEstimateScreen() {
   const [clientName, setClientName] = useState('');
   const [address, setAddress] = useState('');
 
-  // AI-generated estimate state
-  const [generatedEstimate, setGeneratedEstimate] = useState<any>(null);
+  // Editable estimate state
+  const [projectName, setProjectName] = useState('');
+  const [summary, setSummary] = useState('');
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [labor, setLabor] = useState<LaborItem[]>([]);
+  const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
+  const [overheadPercent, setOverheadPercent] = useState('10');
+  const [profitPercent, setProfitPercent] = useState('15');
+
+  // Calculate totals
+  const calculateTotals = () => {
+    const materialsTotal = materials.reduce((sum, m) => sum + (m.quantity * m.unit_price), 0);
+    const laborTotal = labor.reduce((sum, l) => sum + (l.hours * l.rate), 0);
+    const equipmentTotal = equipment.reduce((sum, e) => sum + (e.days * e.daily_rate), 0);
+    const subtotal = materialsTotal + laborTotal + equipmentTotal;
+    const overhead = subtotal * (parseFloat(overheadPercent) || 0) / 100;
+    const profit = (subtotal + overhead) * (parseFloat(profitPercent) || 0) / 100;
+    const grandTotal = subtotal + overhead + profit;
+
+    return {
+      materials: materialsTotal,
+      labor: laborTotal,
+      equipment: equipmentTotal,
+      subtotal,
+      overhead,
+      profit,
+      grandTotal,
+    };
+  };
+
+  const totals = calculateTotals();
 
   const examplePrompts = [
     "I need to rewire my kitchen with 6 GFCI outlets, 4 recessed lights, and under-cabinet lighting",
@@ -53,7 +104,12 @@ export default function SmartEstimateScreen() {
       );
 
       if (response.data.success) {
-        setGeneratedEstimate(response.data);
+        // Set editable state from AI response
+        setProjectName(response.data.project_name || 'Electrical Project');
+        setSummary(response.data.summary || '');
+        setMaterials(response.data.materials || []);
+        setLabor(response.data.labor || []);
+        setEquipment(response.data.equipment || []);
         setStep('review');
       } else {
         Alert.alert('AI Analysis', response.data.raw_analysis || response.data.message);
@@ -65,25 +121,90 @@ export default function SmartEstimateScreen() {
     }
   };
 
-  const handleCreateEstimate = async () => {
-    if (!generatedEstimate) return;
+  // Update material item
+  const updateMaterial = (index: number, field: keyof MaterialItem, value: string) => {
+    const updated = [...materials];
+    if (field === 'name' || field === 'unit') {
+      updated[index][field] = value;
+    } else {
+      updated[index][field] = parseFloat(value) || 0;
+    }
+    updated[index].total = updated[index].quantity * updated[index].unit_price;
+    setMaterials(updated);
+  };
 
+  // Update labor item
+  const updateLabor = (index: number, field: keyof LaborItem, value: string) => {
+    const updated = [...labor];
+    if (field === 'description') {
+      updated[index][field] = value;
+    } else {
+      updated[index][field] = parseFloat(value) || 0;
+    }
+    updated[index].total = updated[index].hours * updated[index].rate;
+    setLabor(updated);
+  };
+
+  // Update equipment item
+  const updateEquipment = (index: number, field: keyof EquipmentItem, value: string) => {
+    const updated = [...equipment];
+    if (field === 'name') {
+      updated[index][field] = value;
+    } else {
+      updated[index][field] = parseFloat(value) || 0;
+    }
+    updated[index].total = updated[index].days * updated[index].daily_rate;
+    setEquipment(updated);
+  };
+
+  // Remove item
+  const removeMaterial = (index: number) => {
+    setMaterials(materials.filter((_, i) => i !== index));
+  };
+
+  const removeLabor = (index: number) => {
+    setLabor(labor.filter((_, i) => i !== index));
+  };
+
+  const removeEquipment = (index: number) => {
+    setEquipment(equipment.filter((_, i) => i !== index));
+  };
+
+  // Add new item
+  const addMaterial = () => {
+    setMaterials([...materials, { name: 'New Material', unit: 'each', quantity: 1, unit_price: 0, total: 0 }]);
+  };
+
+  const addLabor = () => {
+    setLabor([...labor, { description: 'New Labor', hours: 1, rate: 75, total: 75 }]);
+  };
+
+  const addEquipment = () => {
+    setEquipment([...equipment, { name: 'New Equipment', days: 1, daily_rate: 0, total: 0 }]);
+  };
+
+  const handleCreateEstimate = async () => {
     setLoading(true);
     try {
+      // Recalculate totals for each item
+      const finalMaterials = materials.map(m => ({ ...m, total: m.quantity * m.unit_price }));
+      const finalLabor = labor.map(l => ({ ...l, total: l.hours * l.rate }));
+      const finalEquipment = equipment.map(e => ({ ...e, total: e.days * e.daily_rate }));
+
       const estimateData = {
-        project_name: generatedEstimate.project_name,
-        project_type: generatedEstimate.project_type,
-        client_name: generatedEstimate.client_name || clientName || 'Client',
+        project_name: projectName,
+        project_type: projectType,
+        client_name: clientName || 'Client',
         client_email: undefined,
         client_phone: undefined,
-        address: generatedEstimate.address || address,
+        address: address || undefined,
         description: projectDescription,
-        materials: generatedEstimate.materials || [],
-        labor: generatedEstimate.labor || [],
-        equipment: generatedEstimate.equipment || [],
-        overhead_percentage: 10,
-        profit_percentage: 15,
-        notes: `AI-generated estimate based on: "${projectDescription}"\n\n${generatedEstimate.summary || ''}`,
+        materials: finalMaterials,
+        labor: finalLabor,
+        equipment: finalEquipment,
+        overhead_percentage: parseFloat(overheadPercent) || 10,
+        profit_percentage: parseFloat(profitPercent) || 15,
+        notes: `AI-assisted estimate based on: "${projectDescription}"\n\n${summary}`,
       };
 
       const response = await estimatesApi.create(estimateData);
@@ -228,138 +349,297 @@ Example: I need to rewire my kitchen with 6 GFCI outlets near the counters, 4 re
   const renderReviewStep = () => (
     <>
       <View style={styles.successBadge}>
-        <Ionicons name="checkmark-circle" size={24} color="#10b981" />
-        <Text style={styles.successText}>AI Analysis Complete</Text>
+        <Ionicons name="create" size={24} color="#f59e0b" />
+        <Text style={styles.successText}>Edit Your Estimate</Text>
       </View>
 
-      {generatedEstimate && (
-        <>
-          {/* Project Summary */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{generatedEstimate.project_name}</Text>
-            <Text style={styles.cardSubtitle}>{generatedEstimate.summary}</Text>
-          </View>
+      <Text style={styles.editHint}>
+        Tap any field to adjust prices, quantities, or rates
+      </Text>
 
-          {/* Materials */}
-          {generatedEstimate.materials?.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="construct" size={20} color="#f59e0b" />
-                <Text style={styles.cardHeaderTitle}>Materials</Text>
-                <Text style={styles.cardHeaderTotal}>
-                  ${generatedEstimate.totals?.materials?.toLocaleString()}
-                </Text>
+      {/* Project Name */}
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>Project Name</Text>
+        <TextInput
+          style={styles.editableTitle}
+          value={projectName}
+          onChangeText={setProjectName}
+          placeholder="Project name"
+          placeholderTextColor="#6b7280"
+        />
+      </View>
+
+      {/* Materials */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="construct" size={20} color="#f59e0b" />
+          <Text style={styles.cardHeaderTitle}>Materials</Text>
+          <Text style={styles.cardHeaderTotal}>
+            ${totals.materials.toFixed(2)}
+          </Text>
+        </View>
+        
+        {materials.map((item, index) => (
+          <View key={index} style={styles.editableItem}>
+            <View style={styles.editableItemHeader}>
+              <TextInput
+                style={styles.editableName}
+                value={item.name}
+                onChangeText={(val) => updateMaterial(index, 'name', val)}
+                placeholder="Material name"
+                placeholderTextColor="#6b7280"
+              />
+              <TouchableOpacity onPress={() => removeMaterial(index)}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.editableRow}>
+              <View style={styles.editableField}>
+                <Text style={styles.fieldLabel}>Qty</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={item.quantity.toString()}
+                  onChangeText={(val) => updateMaterial(index, 'quantity', val)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6b7280"
+                />
               </View>
-              {generatedEstimate.materials.map((item: any, index: number) => (
-                <View key={index} style={styles.lineItem}>
-                  <View style={styles.lineItemInfo}>
-                    <Text style={styles.lineItemName}>{item.name}</Text>
-                    <Text style={styles.lineItemDetails}>
-                      {item.quantity} {item.unit} @ ${item.unit_price}
-                    </Text>
-                  </View>
-                  <Text style={styles.lineItemTotal}>${item.total?.toFixed(2)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Labor */}
-          {generatedEstimate.labor?.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="people" size={20} color="#3b82f6" />
-                <Text style={styles.cardHeaderTitle}>Labor</Text>
-                <Text style={styles.cardHeaderTotal}>
-                  ${generatedEstimate.totals?.labor?.toLocaleString()}
-                </Text>
+              <View style={styles.editableField}>
+                <Text style={styles.fieldLabel}>Unit</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={item.unit}
+                  onChangeText={(val) => updateMaterial(index, 'unit', val)}
+                  placeholder="each"
+                  placeholderTextColor="#6b7280"
+                />
               </View>
-              {generatedEstimate.labor.map((item: any, index: number) => (
-                <View key={index} style={styles.lineItem}>
-                  <View style={styles.lineItemInfo}>
-                    <Text style={styles.lineItemName}>{item.description}</Text>
-                    <Text style={styles.lineItemDetails}>
-                      {item.hours} hrs @ ${item.rate}/hr
-                    </Text>
-                  </View>
-                  <Text style={styles.lineItemTotal}>${item.total?.toFixed(2)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Equipment */}
-          {generatedEstimate.equipment?.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="hammer" size={20} color="#8b5cf6" />
-                <Text style={styles.cardHeaderTitle}>Equipment</Text>
-                <Text style={styles.cardHeaderTotal}>
-                  ${generatedEstimate.totals?.equipment?.toLocaleString()}
-                </Text>
+              <View style={styles.editableField}>
+                <Text style={styles.fieldLabel}>Price</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={item.unit_price.toString()}
+                  onChangeText={(val) => updateMaterial(index, 'unit_price', val)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6b7280"
+                />
               </View>
-              {generatedEstimate.equipment.map((item: any, index: number) => (
-                <View key={index} style={styles.lineItem}>
-                  <View style={styles.lineItemInfo}>
-                    <Text style={styles.lineItemName}>{item.name}</Text>
-                    <Text style={styles.lineItemDetails}>
-                      {item.days} days @ ${item.daily_rate}/day
-                    </Text>
-                  </View>
-                  <Text style={styles.lineItemTotal}>${item.total?.toFixed(2)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Grand Total */}
-          <View style={styles.totalCard}>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Subtotal</Text>
-              <Text style={styles.totalValue}>${generatedEstimate.totals?.subtotal?.toLocaleString()}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Overhead (10%)</Text>
-              <Text style={styles.totalValue}>${generatedEstimate.totals?.overhead?.toLocaleString()}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Profit (15%)</Text>
-              <Text style={styles.totalValue}>${generatedEstimate.totals?.profit?.toLocaleString()}</Text>
-            </View>
-            <View style={[styles.totalRow, styles.grandTotalRow]}>
-              <Text style={styles.grandTotalLabel}>Grand Total</Text>
-              <Text style={styles.grandTotalValue}>
-                ${generatedEstimate.totals?.grand_total?.toLocaleString()}
-              </Text>
+              <View style={styles.totalField}>
+                <Text style={styles.fieldLabel}>Total</Text>
+                <Text style={styles.itemTotal}>${(item.quantity * item.unit_price).toFixed(2)}</Text>
+              </View>
             </View>
           </View>
+        ))}
+        
+        <TouchableOpacity style={styles.addItemButton} onPress={addMaterial}>
+          <Ionicons name="add-circle-outline" size={20} color="#f59e0b" />
+          <Text style={styles.addItemText}>Add Material</Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setStep('input')}
-            >
-              <Ionicons name="arrow-back" size={20} color="#fff" />
-              <Text style={styles.backButtonText}>Edit Description</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.createButton, loading && styles.buttonDisabled]}
-              onPress={handleCreateEstimate}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark" size={20} color="#000" />
-                  <Text style={styles.createButtonText}>Create Estimate</Text>
-                </>
-              )}
-            </TouchableOpacity>
+      {/* Labor */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="people" size={20} color="#3b82f6" />
+          <Text style={styles.cardHeaderTitle}>Labor</Text>
+          <Text style={styles.cardHeaderTotal}>
+            ${totals.labor.toFixed(2)}
+          </Text>
+        </View>
+        
+        {labor.map((item, index) => (
+          <View key={index} style={styles.editableItem}>
+            <View style={styles.editableItemHeader}>
+              <TextInput
+                style={styles.editableName}
+                value={item.description}
+                onChangeText={(val) => updateLabor(index, 'description', val)}
+                placeholder="Labor description"
+                placeholderTextColor="#6b7280"
+              />
+              <TouchableOpacity onPress={() => removeLabor(index)}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.editableRow}>
+              <View style={styles.editableField}>
+                <Text style={styles.fieldLabel}>Hours</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={item.hours.toString()}
+                  onChangeText={(val) => updateLabor(index, 'hours', val)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6b7280"
+                />
+              </View>
+              <View style={styles.editableField}>
+                <Text style={styles.fieldLabel}>Rate/hr</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={item.rate.toString()}
+                  onChangeText={(val) => updateLabor(index, 'rate', val)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6b7280"
+                />
+              </View>
+              <View style={styles.totalField}>
+                <Text style={styles.fieldLabel}>Total</Text>
+                <Text style={styles.itemTotal}>${(item.hours * item.rate).toFixed(2)}</Text>
+              </View>
+            </View>
           </View>
-        </>
-      )}
+        ))}
+        
+        <TouchableOpacity style={styles.addItemButton} onPress={addLabor}>
+          <Ionicons name="add-circle-outline" size={20} color="#3b82f6" />
+          <Text style={[styles.addItemText, { color: '#3b82f6' }]}>Add Labor</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Equipment */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="hammer" size={20} color="#8b5cf6" />
+          <Text style={styles.cardHeaderTitle}>Equipment</Text>
+          <Text style={styles.cardHeaderTotal}>
+            ${totals.equipment.toFixed(2)}
+          </Text>
+        </View>
+        
+        {equipment.map((item, index) => (
+          <View key={index} style={styles.editableItem}>
+            <View style={styles.editableItemHeader}>
+              <TextInput
+                style={styles.editableName}
+                value={item.name}
+                onChangeText={(val) => updateEquipment(index, 'name', val)}
+                placeholder="Equipment name"
+                placeholderTextColor="#6b7280"
+              />
+              <TouchableOpacity onPress={() => removeEquipment(index)}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.editableRow}>
+              <View style={styles.editableField}>
+                <Text style={styles.fieldLabel}>Days</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={item.days.toString()}
+                  onChangeText={(val) => updateEquipment(index, 'days', val)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6b7280"
+                />
+              </View>
+              <View style={styles.editableField}>
+                <Text style={styles.fieldLabel}>Rate/day</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={item.daily_rate.toString()}
+                  onChangeText={(val) => updateEquipment(index, 'daily_rate', val)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#6b7280"
+                />
+              </View>
+              <View style={styles.totalField}>
+                <Text style={styles.fieldLabel}>Total</Text>
+                <Text style={styles.itemTotal}>${(item.days * item.daily_rate).toFixed(2)}</Text>
+              </View>
+            </View>
+          </View>
+        ))}
+        
+        <TouchableOpacity style={styles.addItemButton} onPress={addEquipment}>
+          <Ionicons name="add-circle-outline" size={20} color="#8b5cf6" />
+          <Text style={[styles.addItemText, { color: '#8b5cf6' }]}>Add Equipment</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Markup Settings */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="calculator" size={20} color="#10b981" />
+          <Text style={styles.cardHeaderTitle}>Markup Settings</Text>
+        </View>
+        <View style={styles.markupRow}>
+          <View style={styles.markupField}>
+            <Text style={styles.fieldLabel}>Overhead %</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={overheadPercent}
+              onChangeText={setOverheadPercent}
+              keyboardType="numeric"
+              placeholder="10"
+              placeholderTextColor="#6b7280"
+            />
+          </View>
+          <View style={styles.markupField}>
+            <Text style={styles.fieldLabel}>Profit %</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={profitPercent}
+              onChangeText={setProfitPercent}
+              keyboardType="numeric"
+              placeholder="15"
+              placeholderTextColor="#6b7280"
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* Grand Total */}
+      <View style={styles.totalCard}>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Subtotal</Text>
+          <Text style={styles.totalValue}>${totals.subtotal.toFixed(2)}</Text>
+        </View>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Overhead ({overheadPercent}%)</Text>
+          <Text style={styles.totalValue}>${totals.overhead.toFixed(2)}</Text>
+        </View>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Profit ({profitPercent}%)</Text>
+          <Text style={styles.totalValue}>${totals.profit.toFixed(2)}</Text>
+        </View>
+        <View style={[styles.totalRow, styles.grandTotalRow]}>
+          <Text style={styles.grandTotalLabel}>Grand Total</Text>
+          <Text style={styles.grandTotalValue}>
+            ${totals.grandTotal.toFixed(2)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setStep('input')}
+        >
+          <Ionicons name="arrow-back" size={20} color="#fff" />
+          <Text style={styles.backButtonText}>Re-analyze</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.createButton, loading && styles.buttonDisabled]}
+          onPress={handleCreateEstimate}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <>
+              <Ionicons name="checkmark" size={20} color="#000" />
+              <Text style={styles.createButtonText}>Create Estimate</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     </>
   );
 
@@ -537,18 +817,24 @@ const styles = StyleSheet.create({
   successBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 25,
     alignSelf: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
     gap: 8,
   },
   successText: {
-    color: '#10b981',
+    color: '#f59e0b',
     fontSize: 14,
     fontWeight: '600',
+  },
+  editHint: {
+    color: '#9ca3af',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   card: {
     backgroundColor: '#1f2937',
@@ -556,16 +842,18 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  cardTitle: {
+  cardLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  editableTitle: {
     color: '#ffffff',
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  cardSubtitle: {
-    color: '#9ca3af',
-    fontSize: 14,
-    lineHeight: 20,
+    backgroundColor: '#374151',
+    borderRadius: 8,
+    padding: 12,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -584,30 +872,79 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  lineItem: {
+  editableItem: {
+    backgroundColor: '#374151',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  editableItemHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  lineItemInfo: {
-    flex: 1,
-  },
-  lineItemName: {
+  editableName: {
     color: '#ffffff',
     fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    backgroundColor: '#1f2937',
+    borderRadius: 6,
+    padding: 8,
+    marginRight: 10,
   },
-  lineItemDetails: {
-    color: '#6b7280',
-    fontSize: 12,
-    marginTop: 2,
+  editableRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  lineItemTotal: {
+  editableField: {
+    flex: 1,
+  },
+  totalField: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  fieldLabel: {
+    color: '#9ca3af',
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  fieldInput: {
+    backgroundColor: '#1f2937',
+    borderRadius: 6,
+    padding: 8,
+    color: '#ffffff',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  itemTotal: {
     color: '#10b981',
     fontSize: 14,
     fontWeight: '600',
+    marginTop: 8,
+  },
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#374151',
+    marginTop: 8,
+  },
+  addItemText: {
+    color: '#f59e0b',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  markupRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  markupField: {
+    flex: 1,
   },
   totalCard: {
     backgroundColor: '#1f2937',
