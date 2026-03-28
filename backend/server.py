@@ -15,7 +15,9 @@ from datetime import datetime, timedelta
 import base64
 import json
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+
+# PayPal SDK
+import paypalrestsdk
 
 # Optional: SendGrid for emails (if API key is provided)
 try:
@@ -741,19 +743,32 @@ Respond ONLY with the JSON format specified."""
         logger.error(f"AI project analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
 
-# ===================== STRIPE PAYMENT ENDPOINTS =====================
+# ===================== PAYPAL PAYMENT ENDPOINTS =====================
+
+# Configure PayPal
+def configure_paypal():
+    paypal_client_id = os.environ.get('PAYPAL_CLIENT_ID')
+    paypal_secret = os.environ.get('PAYPAL_CLIENT_SECRET')
+    paypal_mode = os.environ.get('PAYPAL_MODE', 'sandbox')
+    
+    if paypal_client_id and paypal_secret:
+        paypalrestsdk.configure({
+            "mode": paypal_mode,  # "sandbox" or "live"
+            "client_id": paypal_client_id,
+            "client_secret": paypal_secret
+        })
+        return True
+    return False
 
 @api_router.post("/payments/checkout")
-async def create_checkout_session(request: SubscriptionCheckoutRequest, http_request: Request, current_user: dict = Depends(get_current_user)):
-    """Create a Stripe checkout session for subscription payment"""
+async def create_paypal_payment(request: SubscriptionCheckoutRequest, http_request: Request, current_user: dict = Depends(get_current_user)):
+    """Create a PayPal payment for subscription"""
     try:
-        stripe_api_key = os.environ.get('STRIPE_API_KEY')
-        if not stripe_api_key or stripe_api_key == 'sk_test_emergent':
-            # Return mocked response if no real Stripe key
+        if not configure_paypal():
             return {
                 "success": False,
                 "mocked": True,
-                "message": "Stripe API key not configured. Add your STRIPE_API_KEY to .env to enable real payments.",
+                "message": "PayPal not configured. Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET to .env",
                 "tier": request.tier,
                 "price": SUBSCRIPTION_PACKAGES.get(request.tier, {}).get('price', 0)
             }
@@ -763,148 +778,148 @@ async def create_checkout_session(request: SubscriptionCheckoutRequest, http_req
         
         package = SUBSCRIPTION_PACKAGES[request.tier]
         
-        # Build URLs from frontend origin
-        success_url = f"{request.origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
-        cancel_url = f"{request.origin_url}/(tabs)/profile"
+        # Create PayPal payment
+        payment = paypalrestsdk.Payment({
+            "intent": "sale",
+            "payer": {
+                "payment_method": "paypal"
+            },
+            "redirect_urls": {
+                "return_url": f"{request.origin_url}/payment-success",
+                "cancel_url": f"{request.origin_url}/(tabs)/profile"
+            },
+            "transactions": [{
+                "item_list": {
+                    "items": [{
+                        "name": package['name'],
+                        "sku": request.tier,
+                        "price": str(package['price']),
+                        "currency": "USD",
+                        "quantity": 1
+                    }]
+                },
+                "amount": {
+                    "total": str(package['price']),
+                    "currency": "USD"
+                },
+                "description": f"EstimatePro {package['name']} Subscription"
+            }]
+        })
         
-        # Create webhook URL
-        host_url = str(http_request.base_url).rstrip('/')
-        webhook_url = f"{host_url}/api/webhook/stripe"
-        
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-        
-        checkout_request = CheckoutSessionRequest(
-            amount=package['price'],
-            currency="usd",
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={
+        if payment.create():
+            # Store payment info in database
+            transaction = {
+                "id": str(uuid.uuid4()),
+                "paypal_payment_id": payment.id,
                 "user_id": current_user["id"],
+                "user_email": current_user["email"],
                 "tier": request.tier,
-                "user_email": current_user["email"]
+                "amount": package['price'],
+                "currency": "USD",
+                "status": "created",
+                "payment_status": "pending",
+                "created_at": datetime.utcnow()
             }
-        )
-        
-        session = await stripe_checkout.create_checkout_session(checkout_request)
-        
-        # Create payment transaction record
-        transaction = {
-            "id": str(uuid.uuid4()),
-            "session_id": session.session_id,
-            "user_id": current_user["id"],
-            "user_email": current_user["email"],
-            "tier": request.tier,
-            "amount": package['price'],
-            "currency": "usd",
-            "status": "initiated",
-            "payment_status": "pending",
-            "created_at": datetime.utcnow()
-        }
-        await db.payment_transactions.insert_one(transaction)
-        
-        return {
-            "success": True,
-            "checkout_url": session.url,
-            "session_id": session.session_id
-        }
-        
-    except Exception as e:
-        logger.error(f"Stripe checkout error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Payment processing failed: {str(e)}")
-
-@api_router.get("/payments/status/{session_id}")
-async def get_payment_status(session_id: str, current_user: dict = Depends(get_current_user)):
-    """Check the status of a payment session"""
-    try:
-        stripe_api_key = os.environ.get('STRIPE_API_KEY')
-        if not stripe_api_key or stripe_api_key == 'sk_test_emergent':
-            return {"success": False, "mocked": True, "message": "Stripe not configured"}
-        
-        # Check if already processed
-        transaction = await db.payment_transactions.find_one({"session_id": session_id})
-        if transaction and transaction.get("payment_status") == "paid":
+            await db.payment_transactions.insert_one(transaction)
+            
+            # Find approval URL
+            approval_url = None
+            for link in payment.links:
+                if link.rel == "approval_url":
+                    approval_url = link.href
+                    break
+            
             return {
                 "success": True,
-                "status": "complete",
-                "payment_status": "paid",
-                "tier": transaction.get("tier"),
-                "message": "Payment already processed"
+                "payment_id": payment.id,
+                "approval_url": approval_url
             }
-        
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
-        checkout_status = await stripe_checkout.get_checkout_status(session_id)
-        
-        # Update transaction record
-        if checkout_status.payment_status == "paid":
-            # Update user subscription
-            tier = checkout_status.metadata.get("tier", "basic")
-            user_id = checkout_status.metadata.get("user_id")
+        else:
+            logger.error(f"PayPal payment creation failed: {payment.error}")
+            raise HTTPException(status_code=500, detail=f"PayPal error: {payment.error}")
             
-            if user_id:
-                await db.users.update_one(
-                    {"id": user_id},
-                    {"$set": {"subscription_tier": tier, "subscription_start": datetime.utcnow()}}
-                )
-            
-            # Update transaction
-            await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {"$set": {"status": "complete", "payment_status": "paid", "updated_at": datetime.utcnow()}}
-            )
-        elif checkout_status.status == "expired":
-            await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {"$set": {"status": "expired", "payment_status": "failed", "updated_at": datetime.utcnow()}}
-            )
-        
-        return {
-            "success": True,
-            "status": checkout_status.status,
-            "payment_status": checkout_status.payment_status,
-            "amount": checkout_status.amount_total / 100,  # Convert from cents
-            "currency": checkout_status.currency,
-            "tier": checkout_status.metadata.get("tier")
-        }
-        
     except Exception as e:
-        logger.error(f"Payment status check error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to check payment status: {str(e)}")
+        logger.error(f"PayPal checkout error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Payment processing failed: {str(e)}")
 
-@api_router.post("/webhook/stripe")
-async def stripe_webhook(request: Request):
-    """Handle Stripe webhook events"""
+@api_router.post("/payments/execute")
+async def execute_paypal_payment(payment_id: str, payer_id: str, current_user: dict = Depends(get_current_user)):
+    """Execute a PayPal payment after user approval"""
     try:
-        stripe_api_key = os.environ.get('STRIPE_API_KEY')
-        if not stripe_api_key or stripe_api_key == 'sk_test_emergent':
-            return {"received": True, "mocked": True}
+        if not configure_paypal():
+            return {"success": False, "mocked": True, "message": "PayPal not configured"}
         
-        body = await request.body()
-        signature = request.headers.get("Stripe-Signature")
+        payment = paypalrestsdk.Payment.find(payment_id)
         
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
-        webhook_response = await stripe_checkout.handle_webhook(body, signature)
-        
-        if webhook_response.payment_status == "paid":
-            # Update user subscription
-            user_id = webhook_response.metadata.get("user_id")
-            tier = webhook_response.metadata.get("tier", "basic")
+        if payment.execute({"payer_id": payer_id}):
+            # Find transaction and update
+            transaction = await db.payment_transactions.find_one({"paypal_payment_id": payment_id})
             
-            if user_id:
+            if transaction:
+                tier = transaction.get("tier", "basic")
+                
+                # Update user subscription
                 await db.users.update_one(
-                    {"id": user_id},
+                    {"id": current_user["id"]},
                     {"$set": {"subscription_tier": tier, "subscription_start": datetime.utcnow()}}
                 )
                 
+                # Update transaction
                 await db.payment_transactions.update_one(
-                    {"session_id": webhook_response.session_id},
-                    {"$set": {"status": "complete", "payment_status": "paid", "updated_at": datetime.utcnow()}}
+                    {"paypal_payment_id": payment_id},
+                    {"$set": {"status": "completed", "payment_status": "paid", "updated_at": datetime.utcnow()}}
                 )
+            
+            return {
+                "success": True,
+                "message": "Payment completed successfully!",
+                "tier": transaction.get("tier") if transaction else "basic"
+            }
+        else:
+            logger.error(f"PayPal payment execution failed: {payment.error}")
+            return {"success": False, "error": payment.error}
+            
+    except Exception as e:
+        logger.error(f"PayPal execute error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Payment execution failed: {str(e)}")
+
+@api_router.get("/payments/status/{payment_id}")
+async def get_paypal_payment_status(payment_id: str, current_user: dict = Depends(get_current_user)):
+    """Check the status of a PayPal payment"""
+    try:
+        # Check database first
+        transaction = await db.payment_transactions.find_one({"paypal_payment_id": payment_id})
+        if transaction:
+            return {
+                "success": True,
+                "status": transaction.get("status"),
+                "payment_status": transaction.get("payment_status"),
+                "tier": transaction.get("tier"),
+                "amount": transaction.get("amount")
+            }
         
-        return {"received": True}
+        if not configure_paypal():
+            return {"success": False, "mocked": True, "message": "PayPal not configured"}
+        
+        payment = paypalrestsdk.Payment.find(payment_id)
+        
+        return {
+            "success": True,
+            "status": payment.state,
+            "payment_id": payment.id
+        }
         
     except Exception as e:
-        logger.error(f"Stripe webhook error: {str(e)}")
-        return {"received": True, "error": str(e)}
+        logger.error(f"PayPal status check error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to check payment status: {str(e)}")
+
+@api_router.get("/payments/config")
+async def get_paypal_config():
+    """Get PayPal client ID for frontend"""
+    client_id = os.environ.get('PAYPAL_CLIENT_ID')
+    if client_id:
+        return {"client_id": client_id, "configured": True}
+    return {"client_id": None, "configured": False}
 
 # ===================== SENDGRID EMAIL ENDPOINTS =====================
 
