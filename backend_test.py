@@ -12,7 +12,7 @@ from datetime import datetime
 import os
 
 # Get backend URL from environment
-BACKEND_URL = "https://estimate-pro-33.preview.emergentagent.com/api"
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000/api")
 
 class ElectricalEstimatorAPITest:
     def __init__(self):

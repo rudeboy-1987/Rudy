@@ -1,22 +1,43 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Electrical Estimator",
+    "slug": "electrical-estimator",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "electricalestimator",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rudyelectrical.estimator",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to capture blueprint images for AI-powered project analysis.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to attach blueprint and project images to estimates.",
+        "NSPhotoLibraryAddUsageDescription": "This app saves project images to your photo library.",
+        "NSMicrophoneUsageDescription": "This app may use the microphone for voice input when creating estimates.",
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to find nearby jobs and improve estimate accuracy.",
+        "NSContactsUsageDescription": "This app accesses contacts to autofill client information when creating estimates."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.rudyelectrical.estimator",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.INTERNET"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +58,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "privacyPolicyUrl": "https://rudyelectrical.com/privacy-policy",
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
     }
   }
 }
