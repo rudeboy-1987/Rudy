@@ -62,6 +62,7 @@
     "extra": {
       "privacyPolicyUrl": "https://rudyelectrical.com/privacy-policy",
       "eas": {
+        "_projectId_note": "Replace with your EAS project ID. Run 'eas init' or find it at expo.dev/accounts/<username>/projects",
         "projectId": "your-eas-project-id"
       }
     }

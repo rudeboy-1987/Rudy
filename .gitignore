@@ -81,3 +81,9 @@ android-sdk/ -e
 # Environment files
 *.env
 *.env.*
+!.env.example
+!**/.env.example
+
+# Google service account keys (used for Play Store deployment)
+google-service-account.json
+**/google-service-account.json

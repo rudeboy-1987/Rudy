@@ -31,12 +31,17 @@
   },
   "submit": {
     "production": {
+      "_comment": "Replace the placeholder values below before submitting. Run 'eas submit --help' for more info.",
       "ios": {
+        "_appleId_note": "Your Apple ID email used to log in to App Store Connect",
         "appleId": "your-apple-id@example.com",
+        "_ascAppId_note": "The numeric App ID from App Store Connect (App Information > Apple ID)",
         "ascAppId": "your-app-store-connect-app-id",
+        "_appleTeamId_note": "Your 10-character Apple Developer Team ID from developer.apple.com/account",
         "appleTeamId": "YOUR_APPLE_TEAM_ID"
       },
       "android": {
+        "_serviceAccountKeyPath_note": "Path to your Google service account JSON key (download from Google Play Console). Never commit this file.",
         "serviceAccountKeyPath": "./google-service-account.json",
         "track": "internal"
       }
