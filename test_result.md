@@ -379,18 +379,127 @@ frontend:
         agent: "main"
         comment: "Edit company name, phone, bio"
 
+  - task: "Live Lead Marketplace - Verification (Email + SMS via Twilio)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/leads/verify/send sends 6-digit code via Twilio SMS or SendGrid email (with SMTP fallback). POST /api/leads/verify/check validates the code (expires in 10 min, max 5 attempts). When delivery not configured, returns dev_code in response body. Twilio creds wired (SID AC2661b7869bd70715f19d0aad4c820f64, number +18332428534). Email currently has no SendGrid/SMTP key so it falls back to dev_code mode."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All verification flows pass. POST /leads/verify/send with channel=email returns delivered=false, delivery_mode=email_not_configured, dev_code populated as expected (no SendGrid). channel=sms to a fake test number returns delivered=false, delivery_mode=twilio_failed, dev_code populated (Twilio rejects invalid number with 21211 — handled gracefully). Bad channel ('foo') → 400. POST /leads/verify/check: correct code returns success+verified, wrong code → 400, unknown id → 404, 6th wrong attempt → 429."
+
+  - task: "Live Lead Marketplace - Public Lead Posting"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/leads (no auth) accepts homeowner/business lead with project info, contact, zip code. Requires email_verification_id and sms_verification_id (both must be verified) for poster's email and phone. Backend computes lead_price tier ($5 <$500, $7 $500-2k, $10 >$2k) and geocodes zip to lat/lng/city/state via pgeocode. GET /api/leads-public/zip-lookup/{zip} works to validate zips and return city/state."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All scenarios pass. GET /api/leads-public/zip-lookup/10001 returns {lat:40.75, lng:-73.99, city:'New York', state:'NY'}; 00000 → 404. POST /api/leads correctly enforces verifications (unverified pair → 400), rejects mismatched email (poster_email differs from verified email destination → 400), rejects invalid zip (00000 → 400). On success returns {success, lead_id, lead_price, tier, message}. Pricing tiers verified: $350 → $5/small, $1200 → $7/medium, $8500 → $10/large. Created lead in DB has status=open, max_unlocks=5, unlocked_by=[], lat/lng populated."
+
+  - task: "Live Lead Marketplace - Contractor Feed with Geo Radius"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/leads/feed?zip=&radius=&project_type=&urgency=&min_budget=&max_budget= returns leads sorted by distance. Radius clamped 1-200 miles. Haversine distance from contractor zip used to filter. Contact info (name last initial, phone, email, address) masked unless contractor unlocked. Returns slots_remaining, unlock_count, is_unlocked, distance_miles. 5 demo leads seeded in DB (residential, commercial, emergency, EV charger, restaurant)."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /leads/feed?zip=10001&radius=50 returns 8 leads (5 demo + 3 new test leads), all with is_unlocked=false, slots_remaining=5, distance_miles populated, poster_email masked (e.g. 's*************r@example.com'), poster_phone masked ('***-***-XXXX'), poster_name truncated to first + last initial. Sorted by distance ASC (0.0, 0.0, 1.9, 2.3, 3.3...). Radius=500 clamped to 200. Radius=1 from 10001 returns only 10001 leads (count=2). project_type=residential filter reduces count to only residential leads. GET /leads/{id} masks contact when not unlocked, unknown id → 404."
+
+  - task: "Live Lead Marketplace - Lead Unlock via PayPal"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/leads/{lead_id}/unlock/create creates a PayPal sale order for the lead_price (auth required, refuses if contractor already unlocked or lead has 5 unlocks). POST /api/leads/{lead_id}/unlock/capture?payment_id=&payer_id= executes PayPal payment, atomically adds contractor to unlocked_by array (only if size < 5), marks lead status=locked when cap reached. GET /api/leads/my-unlocked returns the contractor's unlocked leads with full contact details. Uses existing live PayPal credentials."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /leads/{id}/unlock/create returns success=true with payment_id, approval_url starting with 'https://www.paypal.com/cgi-bin/webscr?cmd=_express...' (LIVE mode), amount matches lead.lead_price ($7.00 for medium tier), lead_id echoed back. Calling create twice in a row returns 2 distinct payment_ids (capture is what adds to unlocked_by, not create). Unknown lead_id → 404. GET /leads/my-unlocked returns {count:0, leads:[]} for fresh contractor (no captures performed). PayPal capture endpoint NOT tested (would require real PayerID from PayPal flow)."
+
+frontend:
+  - task: "Live Leads Tab - Feed with radius slider & auto-refresh"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/jobs.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Renamed Jobs tab to Leads. Shows live countdown (refreshes every 30s), zip code input, radius chips (1/5/10/25/50/75/100/150/200mi), project type + urgency filters, search. Each lead card shows lead price ($5/$7/$10), urgency badge, distance, slots remaining (5-dot indicator), time ago, optional 'unlocked' banner."
+
+  - task: "Public Post-Lead screen (multi-step + Email/SMS verify)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/post-lead.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "4-step wizard: project info → contact → email code → SMS code → success. Live zip lookup shows city/state. Image attachment via expo-image-picker. Shows dev_code in UI when delivery not configured (for testing). Public route accessible without login via 'Post for free' button on login screen."
+
+  - task: "Lead Detail / PayPal Unlock"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/lead/[id].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Detail screen shows masked contact when not unlocked, full contact (tap-to-call / tap-to-text / tap-to-email) when unlocked. PayPal flow uses WebBrowser.openAuthSessionAsync. Sticky bottom CTA 'Unlock for $X.XX'. Locked state shown when slots == 0."
+
+  - task: "My Unlocked Leads inbox"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/my-leads.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Contractor inbox of leads they paid to unlock with quick call/text/email buttons."
+
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "1.1"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "User Authentication (Register/Login)"
-    - "Estimate CRUD Operations"
-    - "AI Blueprint Analysis"
-    - "Create Estimate Screen"
+    - "Live Lead Marketplace - Verification (Email + SMS via Twilio)"
+    - "Live Lead Marketplace - Public Lead Posting"
+    - "Live Lead Marketplace - Contractor Feed with Geo Radius"
+    - "Live Lead Marketplace - Lead Unlock via PayPal"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -398,3 +507,7 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Initial implementation complete. MVP electrical estimator app with auth, estimates, AI analysis, materials database, job board, and profile management. Backend APIs tested with curl - all working. Frontend screenshots show login, registration, and dashboard working. Need comprehensive backend testing."
+  - agent: "main"
+    message: "NEW FEATURE: Live Lead Marketplace added. Backend has 8 new endpoints (verify/send, verify/check, leads POST, leads/feed, leads/{id}, leads/my-unlocked, unlock/create, unlock/capture, plus zip-lookup public helper). Database has 5 demo leads pre-seeded in NYC area (zips 10001, 10002, 10128, 11201, 07030). Test contractor: test@contractor.com / test123456."
+  - agent: "testing"
+    message: "BACKEND TESTING COMPLETE — Live Lead Marketplace endpoints fully verified. 32/32 tests passed in /app/backend_test.py against the public preview URL. Results: (1) zip-lookup: valid US zips return city/state/lat/lng; 00000 → 404. (2) verify/send: email returns dev_code with delivery_mode=email_not_configured; SMS to fake/unverified numbers returns dev_code with delivery_mode=twilio_failed (Twilio rejects gracefully with 21211/21608); bad channel → 400. (3) verify/check: correct code → success+verified; wrong → 400; unknown id → 404; 6th wrong attempt → 429. (4) POST /leads: rejects unverified, mismatched email, and invalid zip with 400; valid creates with correct tier pricing ($5/$7/$10); DB entry has status=open, max_unlocks=5, unlocked_by=[], lat/lng populated. (5) /leads/feed: masks email/phone/last-name, populates distance_miles, sorts by distance ASC; radius=500 clamps to 200; radius=1 from 10001 returns only 10001 leads; project_type filter works. (6) GET /leads/{id} returns masked detail; unknown → 404. (7) /unlock/create returns LIVE PayPal approval_url (https://www.paypal.com/cgi-bin/webscr?cmd=_express...), correct amount, lead_id; calling twice succeeds with distinct payment_ids; unknown lead → 404. (8) /my-unlocked returns count=0 for fresh contractor. Smoke tests on /auth/login, /jobs, /materials/prices also pass. The capture endpoint was NOT exercised (requires real PayerID from PayPal flow per instructions)."

@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
 
 export default function Index() {
   const { user, loading } = useAuth();
@@ -21,11 +20,15 @@ export default function Index() {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <Ionicons name="flash" size={80} color="#f59e0b" />
+        <Image 
+          source={require('../assets/logo.png')} 
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>EstimatePro</Text>
         <Text style={styles.subtitle}>Electrical Estimator</Text>
       </View>
-      <ActivityIndicator size="large" color="#f59e0b" />
+      <ActivityIndicator size="large" color="#00ff66" />
     </View>
   );
 }
@@ -41,6 +44,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
+  logo: {
+    width: 120,
+    height: 120,
+    borderRadius: 20,
+  },
   title: {
     fontSize: 36,
     fontWeight: 'bold',
@@ -49,7 +57,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 18,
-    color: '#9ca3af',
+    color: '#00ff66',
     marginTop: 8,
   },
 });

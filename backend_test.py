@@ -1,627 +1,487 @@
-#!/usr/bin/env python3
+"""Backend test suite for Live Lead Marketplace endpoints.
+Hits the public preview backend URL (EXPO_PUBLIC_BACKEND_URL/api).
 """
-Comprehensive Backend API Testing for Electrical Estimator
-Tests all core backend APIs with realistic data
-"""
-
-import requests
-import json
-import uuid
-import base64
-from datetime import datetime
 import os
+import json
+import time
+import sys
+import requests
+from pathlib import Path
 
-# Get backend URL from environment
-BACKEND_URL = "https://estimate-pro-33.preview.emergentagent.com/api"
+def get_backend_url():
+    env_path = Path("/app/frontend/.env")
+    for line in env_path.read_text().splitlines():
+        if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
+            return line.split("=", 1)[1].strip().strip('"')
+    raise SystemExit("Could not find EXPO_PUBLIC_BACKEND_URL")
 
-class ElectricalEstimatorAPITest:
-    def __init__(self):
-        self.base_url = BACKEND_URL
-        self.token = None
-        self.user_id = None
-        self.test_estimate_id = None
-        self.test_job_id = None
-        self.test_results = []
-        
-    def log_test(self, test_name, success, details=""):
-        """Log test results"""
-        status = "✅ PASS" if success else "❌ FAIL"
-        self.test_results.append({
-            "test": test_name,
-            "status": status,
-            "details": details
-        })
-        print(f"{status}: {test_name}")
-        if details:
-            print(f"   Details: {details}")
-    
-    def test_health_check(self):
-        """Test health check endpoint"""
-        try:
-            response = requests.get(f"{self.base_url}/health", timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                self.log_test("Health Check", True, f"Status: {data.get('status')}")
-                return True
-            else:
-                self.log_test("Health Check", False, f"Status code: {response.status_code}")
-                return False
-        except Exception as e:
-            self.log_test("Health Check", False, f"Error: {str(e)}")
-            return False
-    
-    def test_user_registration(self):
-        """Test user registration"""
-        try:
-            # Generate unique email for testing
-            test_email = f"contractor_{uuid.uuid4().hex[:8]}@electricpro.com"
-            
-            registration_data = {
-                "email": test_email,
-                "password": "SecurePass123!",
-                "company_name": "Elite Electrical Solutions",
-                "phone": "+1-555-0123"
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/auth/register",
-                json=registration_data,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.token = data.get("token")
-                self.user_id = data.get("user", {}).get("id")
-                
-                if self.token and self.user_id:
-                    self.log_test("User Registration", True, f"User ID: {self.user_id}")
-                    return True
-                else:
-                    self.log_test("User Registration", False, "Missing token or user ID")
-                    return False
-            else:
-                self.log_test("User Registration", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("User Registration", False, f"Error: {str(e)}")
-            return False
-    
-    def test_user_login(self):
-        """Test user login with existing credentials"""
-        try:
-            # Try with test credentials first
-            login_data = {
-                "email": "test@contractor.com",
-                "password": "test123456"
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/auth/login",
-                json=login_data,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.token = data.get("token")
-                self.user_id = data.get("user", {}).get("id")
-                
-                if self.token and self.user_id:
-                    self.log_test("User Login", True, f"Logged in as: {login_data['email']}")
-                    return True
-                else:
-                    self.log_test("User Login", False, "Missing token or user ID")
-                    return False
-            else:
-                self.log_test("User Login", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("User Login", False, f"Error: {str(e)}")
-            return False
-    
-    def test_get_profile(self):
-        """Test get user profile"""
-        if not self.token:
-            self.log_test("Get Profile", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = requests.get(f"{self.base_url}/auth/me", headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log_test("Get Profile", True, f"Company: {data.get('company_name')}")
-                return True
-            else:
-                self.log_test("Get Profile", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Get Profile", False, f"Error: {str(e)}")
-            return False
-    
-    def test_update_profile(self):
-        """Test update user profile"""
-        if not self.token:
-            self.log_test("Update Profile", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            update_data = {
-                "company_name": "Elite Electrical Solutions LLC",
-                "phone": "+1-555-0199",
-                "bio": "Professional electrical contractors with 15+ years experience in residential and commercial projects."
-            }
-            
-            response = requests.put(
-                f"{self.base_url}/auth/profile",
-                json=update_data,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log_test("Update Profile", True, f"Updated company: {data.get('company_name')}")
-                return True
-            else:
-                self.log_test("Update Profile", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Update Profile", False, f"Error: {str(e)}")
-            return False
-    
-    def test_create_estimate(self):
-        """Test create estimate"""
-        if not self.token:
-            self.log_test("Create Estimate", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            estimate_data = {
-                "project_name": "Kitchen Renovation - Electrical Upgrade",
-                "project_type": "residential",
-                "client_name": "Johnson Family",
-                "client_email": "mjohnson@email.com",
-                "client_phone": "+1-555-0156",
-                "address": "1234 Maple Street, Springfield, IL 62701",
-                "description": "Complete kitchen electrical renovation including new outlets, under-cabinet lighting, and 240V outlet for electric range",
-                "materials": [
-                    {
-                        "name": "12/2 NM-B Wire (250ft)",
-                        "unit": "roll",
-                        "quantity": 2.0,
-                        "unit_price": 125.00,
-                        "total": 250.00
-                    },
-                    {
-                        "name": "GFCI Outlet",
-                        "unit": "each",
-                        "quantity": 4.0,
-                        "unit_price": 18.00,
-                        "total": 72.00
-                    },
-                    {
-                        "name": "LED Under-Cabinet Light",
-                        "unit": "each",
-                        "quantity": 6.0,
-                        "unit_price": 45.00,
-                        "total": 270.00
-                    }
-                ],
-                "labor": [
-                    {
-                        "description": "Install new outlets and GFCI protection",
-                        "hours": 8.0,
-                        "rate": 85.00,
-                        "total": 680.00
-                    },
-                    {
-                        "description": "Install under-cabinet lighting",
-                        "hours": 4.0,
-                        "rate": 85.00,
-                        "total": 340.00
-                    }
-                ],
-                "equipment": [
-                    {
-                        "name": "Wire pulling equipment",
-                        "days": 1.0,
-                        "daily_rate": 50.00,
-                        "total": 50.00
-                    }
-                ],
-                "overhead_percentage": 12.0,
-                "profit_percentage": 18.0,
-                "notes": "All work will be performed to current NEC standards. Permit and inspection included."
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/estimates",
-                json=estimate_data,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.test_estimate_id = data.get("id")
-                grand_total = data.get("grand_total", 0)
-                self.log_test("Create Estimate", True, f"Estimate ID: {self.test_estimate_id}, Total: ${grand_total}")
-                return True
-            else:
-                self.log_test("Create Estimate", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Create Estimate", False, f"Error: {str(e)}")
-            return False
-    
-    def test_get_estimates(self):
-        """Test get all estimates"""
-        if not self.token:
-            self.log_test("Get Estimates", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = requests.get(f"{self.base_url}/estimates", headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                count = len(data) if isinstance(data, list) else 0
-                self.log_test("Get Estimates", True, f"Found {count} estimates")
-                return True
-            else:
-                self.log_test("Get Estimates", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Get Estimates", False, f"Error: {str(e)}")
-            return False
-    
-    def test_get_single_estimate(self):
-        """Test get single estimate"""
-        if not self.token or not self.test_estimate_id:
-            self.log_test("Get Single Estimate", False, "No authentication token or estimate ID")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = requests.get(
-                f"{self.base_url}/estimates/{self.test_estimate_id}",
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                project_name = data.get("project_name", "Unknown")
-                self.log_test("Get Single Estimate", True, f"Project: {project_name}")
-                return True
-            else:
-                self.log_test("Get Single Estimate", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Get Single Estimate", False, f"Error: {str(e)}")
-            return False
-    
-    def test_ai_blueprint_analysis(self):
-        """Test AI blueprint analysis"""
-        if not self.token:
-            self.log_test("AI Blueprint Analysis", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            analysis_data = {
-                "project_description": "2-story residential home addition with 3 bedrooms, 2 bathrooms, kitchen, and living room. Need complete electrical system including panel upgrade to 200A service.",
-                "project_type": "residential"
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/ai/analyze-blueprint",
-                json=analysis_data,
-                headers=headers,
-                timeout=30  # AI calls may take longer
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                analysis = data.get("analysis", "")
-                self.log_test("AI Blueprint Analysis", True, f"Analysis length: {len(analysis)} chars")
-                return True
-            else:
-                self.log_test("AI Blueprint Analysis", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("AI Blueprint Analysis", False, f"Error: {str(e)}")
-            return False
-    
-    def test_ai_generate_estimate(self):
-        """Test AI estimate generation"""
-        if not self.token or not self.test_estimate_id:
-            self.log_test("AI Generate Estimate", False, "No authentication token or estimate ID")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = requests.post(
-                f"{self.base_url}/ai/generate-estimate?estimate_id={self.test_estimate_id}",
-                headers=headers,
-                timeout=30  # AI calls may take longer
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                document = data.get("ai_document", "")
-                self.log_test("AI Generate Estimate", True, f"Document length: {len(document)} chars")
-                return True
-            else:
-                self.log_test("AI Generate Estimate", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("AI Generate Estimate", False, f"Error: {str(e)}")
-            return False
-    
-    def test_material_prices(self):
-        """Test get material prices"""
-        try:
-            response = requests.get(f"{self.base_url}/materials/prices", timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                count = len(data) if isinstance(data, list) else 0
-                self.log_test("Material Prices", True, f"Found {count} materials")
-                return True
-            else:
-                self.log_test("Material Prices", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Material Prices", False, f"Error: {str(e)}")
-            return False
-    
-    def test_seed_materials(self):
-        """Test seed material prices"""
-        try:
-            response = requests.post(f"{self.base_url}/materials/prices/seed", timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                count = data.get("count", 0)
-                self.log_test("Seed Materials", True, f"Seeded {count} materials")
-                return True
-            else:
-                self.log_test("Seed Materials", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Seed Materials", False, f"Error: {str(e)}")
-            return False
-    
-    def test_subscription_status(self):
-        """Test subscription status"""
-        if not self.token:
-            self.log_test("Subscription Status", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = requests.get(f"{self.base_url}/subscription/status", headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                tier = data.get("tier", "unknown")
-                self.log_test("Subscription Status", True, f"Tier: {tier}")
-                return True
-            else:
-                self.log_test("Subscription Status", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Subscription Status", False, f"Error: {str(e)}")
-            return False
-    
-    def test_create_job(self):
-        """Test create job posting"""
-        if not self.token:
-            self.log_test("Create Job", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            job_data = {
-                "poster_type": "homeowner",
-                "poster_name": "Sarah Mitchell",
-                "poster_email": "sarah.mitchell@email.com",
-                "poster_phone": "+1-555-0187",
-                "title": "Whole House Electrical Panel Upgrade",
-                "description": "Need to upgrade from 100A to 200A electrical panel. House is 2,400 sq ft built in 1985. Also need to add GFCI outlets in bathrooms and kitchen. Looking for licensed electrician with good references.",
-                "project_type": "residential",
-                "location": "Springfield, IL",
-                "budget_range": "$3,000 - $5,000",
-                "timeline": "Within 2 weeks"
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/jobs",
-                json=job_data,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.test_job_id = data.get("id")
-                title = data.get("title", "Unknown")
-                self.log_test("Create Job", True, f"Job ID: {self.test_job_id}, Title: {title}")
-                return True
-            else:
-                self.log_test("Create Job", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Create Job", False, f"Error: {str(e)}")
-            return False
-    
-    def test_get_jobs(self):
-        """Test get job listings"""
-        if not self.token:
-            self.log_test("Get Jobs", False, "No authentication token")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = requests.get(f"{self.base_url}/jobs", headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                count = len(data) if isinstance(data, list) else 0
-                self.log_test("Get Jobs", True, f"Found {count} jobs")
-                return True
-            else:
-                self.log_test("Get Jobs", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Get Jobs", False, f"Error: {str(e)}")
-            return False
-    
-    def test_send_estimate_mocked(self):
-        """Test send estimate (mocked)"""
-        if not self.token or not self.test_estimate_id:
-            self.log_test("Send Estimate (MOCKED)", False, "No authentication token or estimate ID")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            send_data = {
-                "estimate_id": self.test_estimate_id,
-                "recipient_email": "mjohnson@email.com",
-                "message": "Please review the attached electrical estimate for your kitchen renovation project."
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/estimates/{self.test_estimate_id}/send",
-                json=send_data,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                message = data.get("message", "")
-                self.log_test("Send Estimate (MOCKED)", True, f"Response: {message}")
-                return True
-            else:
-                self.log_test("Send Estimate (MOCKED)", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Send Estimate (MOCKED)", False, f"Error: {str(e)}")
-            return False
-    
-    def test_delete_estimate(self):
-        """Test delete estimate (cleanup)"""
-        if not self.token or not self.test_estimate_id:
-            self.log_test("Delete Estimate", False, "No authentication token or estimate ID")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            response = requests.delete(
-                f"{self.base_url}/estimates/{self.test_estimate_id}",
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                self.log_test("Delete Estimate", True, "Estimate deleted successfully")
-                return True
-            else:
-                self.log_test("Delete Estimate", False, f"Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Delete Estimate", False, f"Error: {str(e)}")
-            return False
-    
-    def run_all_tests(self):
-        """Run all API tests in sequence"""
-        print(f"🔧 Starting Electrical Estimator API Tests")
-        print(f"🌐 Backend URL: {self.base_url}")
-        print("=" * 60)
-        
-        # Core API tests
-        self.test_health_check()
-        
-        # Authentication flow
-        auth_success = self.test_user_login()  # Try existing user first
-        if not auth_success:
-            auth_success = self.test_user_registration()  # Fallback to registration
-        
-        if auth_success:
-            self.test_get_profile()
-            self.test_update_profile()
-            
-            # Estimate workflow
-            self.test_create_estimate()
-            self.test_get_estimates()
-            self.test_get_single_estimate()
-            
-            # AI features
-            self.test_ai_blueprint_analysis()
-            self.test_ai_generate_estimate()
-            
-            # Material prices
-            self.test_seed_materials()
-            self.test_material_prices()
-            
-            # Subscription
-            self.test_subscription_status()
-            
-            # Job board
-            self.test_create_job()
-            self.test_get_jobs()
-            
-            # Mocked features
-            self.test_send_estimate_mocked()
-            
-            # Cleanup
-            self.test_delete_estimate()
-        
-        # Print summary
-        print("\n" + "=" * 60)
-        print("📊 TEST SUMMARY")
-        print("=" * 60)
-        
-        passed = sum(1 for result in self.test_results if "✅" in result["status"])
-        failed = sum(1 for result in self.test_results if "❌" in result["status"])
-        
-        print(f"Total Tests: {len(self.test_results)}")
-        print(f"Passed: {passed}")
-        print(f"Failed: {failed}")
-        
-        if failed > 0:
-            print("\n❌ FAILED TESTS:")
-            for result in self.test_results:
-                if "❌" in result["status"]:
-                    print(f"  - {result['test']}: {result['details']}")
-        
-        return failed == 0
+BASE = get_backend_url().rstrip("/") + "/api"
+print(f"Testing backend at: {BASE}")
+
+PASS = []
+FAIL = []
+
+def record(name, ok, info=""):
+    (PASS if ok else FAIL).append((name, info))
+    status = "PASS" if ok else "FAIL"
+    print(f"[{status}] {name} - {info}")
+
+def safe_json(resp):
+    try:
+        return resp.json()
+    except Exception:
+        return {"_raw": resp.text}
+
+
+def smoke():
+    r = requests.get(f"{BASE}/materials/prices", timeout=15)
+    record("smoke:GET /materials/prices",
+           r.status_code == 200 and isinstance(r.json(), list) and len(r.json()) > 0,
+           f"status={r.status_code} count={len(r.json()) if r.status_code==200 else 'n/a'}")
+
+
+def login():
+    r = requests.post(f"{BASE}/auth/login",
+                      json={"email": "test@contractor.com", "password": "test123456"},
+                      timeout=15)
+    ok = r.status_code == 200 and "token" in r.json()
+    record("auth:POST /auth/login", ok, f"status={r.status_code}")
+    if not ok:
+        print("Cannot continue without login token:", r.text)
+        sys.exit(1)
+    return r.json()["token"]
+
+
+def smoke_jobs(token):
+    r = requests.get(f"{BASE}/jobs", headers={"Authorization": f"Bearer {token}"}, timeout=15)
+    record("smoke:GET /jobs (auth)", r.status_code == 200, f"status={r.status_code}")
+
+
+def zip_lookup():
+    r = requests.get(f"{BASE}/leads-public/zip-lookup/10001", timeout=15)
+    data = safe_json(r)
+    ok = (
+        r.status_code == 200
+        and isinstance(data, dict)
+        and data.get("lat") is not None
+        and data.get("lng") is not None
+        and data.get("state") == "NY"
+    )
+    record("public:zip-lookup/10001 valid", ok,
+           f"status={r.status_code} city={data.get('city')} state={data.get('state')}")
+
+    r2 = requests.get(f"{BASE}/leads-public/zip-lookup/00000", timeout=15)
+    record("public:zip-lookup/00000 invalid → 404",
+           r2.status_code == 404, f"status={r2.status_code}")
+
+
+def verify_email_flow():
+    r = requests.post(f"{BASE}/leads/verify/send",
+                      json={"channel": "email", "destination": "homeowner.test@example.com"},
+                      timeout=15)
+    data = safe_json(r)
+    ok = (
+        r.status_code == 200
+        and data.get("delivered") is False
+        and data.get("delivery_mode") == "email_not_configured"
+        and data.get("dev_code")
+        and data.get("verification_id")
+    )
+    record("verify:send email returns dev_code", ok,
+           f"status={r.status_code} delivered={data.get('delivered')} mode={data.get('delivery_mode')} dev_code_present={bool(data.get('dev_code'))}")
+    return data if ok else None
+
+
+def verify_sms_flow(phone="+15005550006"):
+    r = requests.post(f"{BASE}/leads/verify/send",
+                      json={"channel": "sms", "destination": phone},
+                      timeout=20)
+    data = safe_json(r)
+    ok = (
+        r.status_code == 200
+        and data.get("verification_id")
+        and (
+            (data.get("delivered") is False and data.get("dev_code"))
+            or data.get("delivered") is True
+        )
+    )
+    record("verify:send sms (fake#) returns dev_code or delivered", ok,
+           f"status={r.status_code} delivered={data.get('delivered')} mode={data.get('delivery_mode')} dev_code_present={bool(data.get('dev_code'))}")
+    return data if ok else None
+
+
+def verify_send_bad_channel():
+    r = requests.post(f"{BASE}/leads/verify/send",
+                      json={"channel": "foo", "destination": "x@y.z"},
+                      timeout=15)
+    record("verify:send bad channel → 400", r.status_code == 400, f"status={r.status_code}")
+
+
+def verify_check_wrong_code(v_data):
+    wrong = "000000" if v_data.get("dev_code") != "000000" else "111111"
+    r = requests.post(f"{BASE}/leads/verify/check",
+                      json={"verification_id": v_data["verification_id"], "code": wrong},
+                      timeout=15)
+    record("verify:check wrong code → 400", r.status_code == 400, f"status={r.status_code}")
+
+
+def verify_check_unknown():
+    r = requests.post(f"{BASE}/leads/verify/check",
+                      json={"verification_id": "nonexistent-id-xyz", "code": "123456"},
+                      timeout=15)
+    record("verify:check unknown id → 404", r.status_code == 404, f"status={r.status_code}")
+
+
+def verify_check_correct(v_data, label):
+    r = requests.post(f"{BASE}/leads/verify/check",
+                      json={"verification_id": v_data["verification_id"], "code": v_data["dev_code"]},
+                      timeout=15)
+    data = safe_json(r)
+    ok = r.status_code == 200 and data.get("success") and data.get("verified")
+    record(f"verify:check correct code ({label})", ok,
+           f"status={r.status_code} body={data}")
+    return ok
+
+
+def verify_rate_limit():
+    s = requests.post(f"{BASE}/leads/verify/send",
+                      json={"channel": "email", "destination": "ratelimit.test@example.com"},
+                      timeout=15)
+    sd = safe_json(s)
+    vid = sd.get("verification_id")
+    if not vid:
+        record("verify:rate_limit setup", False, "could not create verification")
+        return
+    statuses = []
+    for i in range(5):
+        rr = requests.post(f"{BASE}/leads/verify/check",
+                           json={"verification_id": vid, "code": "999999"},
+                           timeout=15)
+        statuses.append(rr.status_code)
+    rr = requests.post(f"{BASE}/leads/verify/check",
+                       json={"verification_id": vid, "code": "999999"},
+                       timeout=15)
+    ok = rr.status_code == 429
+    record("verify:check 6th attempt → 429", ok,
+           f"first5={statuses} sixth={rr.status_code}")
+
+
+def _send_verify_pair(email, phone):
+    ev = requests.post(f"{BASE}/leads/verify/send",
+                       json={"channel": "email", "destination": email}, timeout=15).json()
+    sv = requests.post(f"{BASE}/leads/verify/send",
+                       json={"channel": "sms", "destination": phone}, timeout=20).json()
+    if ev.get("dev_code"):
+        requests.post(f"{BASE}/leads/verify/check",
+                      json={"verification_id": ev["verification_id"], "code": ev["dev_code"]}, timeout=15)
+    if sv.get("dev_code"):
+        requests.post(f"{BASE}/leads/verify/check",
+                      json={"verification_id": sv["verification_id"], "code": sv["dev_code"]}, timeout=15)
+    return ev, sv
+
+
+def post_lead_full_flow():
+    email = "sarah.homeowner@example.com"
+    phone = "+12125550199"
+    ev, sv = _send_verify_pair(email, phone)
+    if not ev.get("dev_code") or not sv.get("dev_code"):
+        record("lead:post setup (verify creation)", False,
+               f"missing dev_code email={ev} sms={sv}")
+        return None
+
+    bad_body = {
+        "poster_name": "Sarah Johnson",
+        "poster_email": email,
+        "poster_phone": phone,
+        "poster_type": "homeowner",
+        "title": "Install ceiling fan in master bedroom",
+        "description": "Need a contractor to install a new ceiling fan with light.",
+        "project_type": "residential",
+        "urgency": "this_week",
+        "estimated_budget": 350.0,
+        "zip_code": "00000",
+        "email_verification_id": ev["verification_id"],
+        "sms_verification_id": sv["verification_id"],
+    }
+    r = requests.post(f"{BASE}/leads", json=bad_body, timeout=15)
+    record("lead:post invalid zip → 400", r.status_code == 400, f"status={r.status_code}")
+
+    mismatch = dict(bad_body)
+    mismatch["poster_email"] = "wrong@example.com"
+    mismatch["zip_code"] = "10001"
+    r = requests.post(f"{BASE}/leads", json=mismatch, timeout=15)
+    record("lead:post email mismatch → 400", r.status_code == 400, f"status={r.status_code}")
+
+    body_small = dict(bad_body)
+    body_small["zip_code"] = "10001"
+    r = requests.post(f"{BASE}/leads", json=body_small, timeout=15)
+    data = safe_json(r)
+    ok = (
+        r.status_code == 200
+        and data.get("success")
+        and data.get("lead_id")
+        and data.get("lead_price") == 5.0
+        and data.get("tier") == "small"
+    )
+    record("lead:post small budget ($350 → $5)", ok,
+           f"status={r.status_code} price={data.get('lead_price')} tier={data.get('tier')}")
+    lead_id_small = data.get("lead_id") if ok else None
+
+    # Medium
+    email2 = "mike.builder@example.com"
+    phone2 = "+13105550133"
+    ev2, sv2 = _send_verify_pair(email2, phone2)
+    body_med = {
+        "poster_name": "Mike Builder",
+        "poster_email": email2,
+        "poster_phone": phone2,
+        "poster_type": "business",
+        "title": "Office lighting retrofit (LED panels)",
+        "description": "Replace 12 fluorescent fixtures with LED panels.",
+        "project_type": "commercial",
+        "urgency": "this_month",
+        "estimated_budget": 1200.0,
+        "zip_code": "11201",
+        "email_verification_id": ev2["verification_id"],
+        "sms_verification_id": sv2["verification_id"],
+    }
+    r = requests.post(f"{BASE}/leads", json=body_med, timeout=15)
+    data = safe_json(r)
+    ok_med = r.status_code == 200 and data.get("lead_price") == 7.0 and data.get("tier") == "medium"
+    record("lead:post medium budget ($1200 → $7)", ok_med,
+           f"status={r.status_code} price={data.get('lead_price')} tier={data.get('tier')}")
+    lead_id_med = data.get("lead_id") if ok_med else None
+
+    # Large
+    email3 = "amy.contractor@example.com"
+    phone3 = "+12125550234"
+    ev3, sv3 = _send_verify_pair(email3, phone3)
+    body_large = {
+        "poster_name": "Amy Contractor",
+        "poster_email": email3,
+        "poster_phone": phone3,
+        "poster_type": "business",
+        "title": "Full house rewire (1920s colonial)",
+        "description": "Complete rewire of 2200sqft home including new panel.",
+        "project_type": "residential",
+        "urgency": "flexible",
+        "estimated_budget": 8500.0,
+        "zip_code": "10128",
+        "email_verification_id": ev3["verification_id"],
+        "sms_verification_id": sv3["verification_id"],
+    }
+    r = requests.post(f"{BASE}/leads", json=body_large, timeout=15)
+    data = safe_json(r)
+    ok_large = r.status_code == 200 and data.get("lead_price") == 10.0 and data.get("tier") == "large"
+    record("lead:post large budget ($8500 → $10)", ok_large,
+           f"status={r.status_code} price={data.get('lead_price')} tier={data.get('tier')}")
+    lead_id_large = data.get("lead_id") if ok_large else None
+
+    return {"small": lead_id_small, "medium": lead_id_med, "large": lead_id_large}
+
+
+def test_lead_with_unverified():
+    ev = requests.post(f"{BASE}/leads/verify/send",
+                       json={"channel": "email", "destination": "unverified@example.com"}, timeout=15).json()
+    sv = requests.post(f"{BASE}/leads/verify/send",
+                       json={"channel": "sms", "destination": "+12125550001"}, timeout=20).json()
+    body = {
+        "poster_name": "Test User",
+        "poster_email": "unverified@example.com",
+        "poster_phone": "+12125550001",
+        "poster_type": "homeowner",
+        "title": "Test",
+        "description": "Test desc",
+        "project_type": "residential",
+        "urgency": "this_week",
+        "estimated_budget": 300,
+        "zip_code": "10001",
+        "email_verification_id": ev["verification_id"],
+        "sms_verification_id": sv["verification_id"],
+    }
+    r = requests.post(f"{BASE}/leads", json=body, timeout=15)
+    record("lead:post unverified → 400", r.status_code == 400, f"status={r.status_code}")
+
+
+def test_feed(token, lead_ids):
+    h = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{BASE}/leads/feed", headers=h,
+                     params={"zip": "10001", "radius": 50}, timeout=15)
+    data = safe_json(r)
+    ok = r.status_code == 200 and "leads" in data and data.get("radius_miles") == 50
+    record("feed:GET /leads/feed zip=10001 radius=50", ok,
+           f"status={r.status_code} count={data.get('count')}")
+    if not ok:
+        return
+    leads = data["leads"]
+    issues = []
+    for ld in leads:
+        if ld.get("is_unlocked") is not False:
+            issues.append(f"is_unlocked != False on {ld.get('id')}")
+        if ld.get("slots_remaining") is None:
+            issues.append(f"slots_remaining missing on {ld.get('id')}")
+        em = ld.get("poster_email") or ""
+        if "@" not in em or "*" not in em:
+            issues.append(f"email not masked: {em}")
+        ph = ld.get("poster_phone") or ""
+        if not ph.startswith("***"):
+            issues.append(f"phone not masked: {ph}")
+        if ld.get("distance_miles") is None:
+            issues.append(f"distance missing on {ld.get('id')}")
+    record("feed:masking + distance populated", len(issues) == 0,
+           f"issues={issues[:3]} total_issues={len(issues)}")
+
+    distances = [ld.get("distance_miles") for ld in leads if ld.get("distance_miles") is not None]
+    sorted_ok = distances == sorted(distances)
+    record("feed:sorted by distance ASC", sorted_ok, f"distances={distances[:5]}")
+
+    r2 = requests.get(f"{BASE}/leads/feed", headers=h,
+                      params={"zip": "10001", "radius": 500}, timeout=15)
+    record("feed:radius=500 clamped to 200",
+           r2.status_code == 200 and r2.json().get("radius_miles") == 200,
+           f"radius_returned={r2.json().get('radius_miles')}")
+
+    r3 = requests.get(f"{BASE}/leads/feed", headers=h,
+                      params={"zip": "10001", "radius": 1}, timeout=15)
+    d3 = r3.json()
+    zips = [ld.get("zip_code") for ld in d3.get("leads", [])]
+    record("feed:radius=1 from 10001 returns only 10001 leads",
+           r3.status_code == 200 and all(z == "10001" for z in zips) and d3.get("count", 0) >= 1,
+           f"count={d3.get('count')} zips={zips}")
+
+    r4 = requests.get(f"{BASE}/leads/feed", headers=h,
+                      params={"zip": "10001", "radius": 50, "project_type": "residential"}, timeout=15)
+    d4 = r4.json()
+    only_res = all(ld.get("project_type") == "residential" for ld in d4.get("leads", []))
+    record("feed:project_type=residential filters correctly",
+           r4.status_code == 200 and only_res and d4.get("count") <= data.get("count"),
+           f"count={d4.get('count')} all_residential={only_res}")
+
+
+def test_lead_detail(token, lead_ids):
+    h = {"Authorization": f"Bearer {token}"}
+    lid = lead_ids.get("small") if lead_ids else None
+    if not lid:
+        r = requests.get(f"{BASE}/leads/feed", headers=h, params={"zip": "10001", "radius": 50}, timeout=15)
+        leads = r.json().get("leads", [])
+        if not leads:
+            record("detail:setup", False, "no lead to test")
+            return
+        lid = leads[0]["id"]
+
+    r = requests.get(f"{BASE}/leads/{lid}", headers=h, timeout=15)
+    data = safe_json(r)
+    ok = r.status_code == 200 and data.get("is_unlocked") is False and "*" in (data.get("poster_email") or "")
+    record("detail:GET /leads/{id} masked", ok,
+           f"status={r.status_code} email={data.get('poster_email')}")
+
+    r2 = requests.get(f"{BASE}/leads/nonexistent-uuid", headers=h, timeout=15)
+    record("detail:GET /leads/{unknown} → 404", r2.status_code == 404, f"status={r2.status_code}")
+
+
+def test_unlock_create(token, lead_ids):
+    h = {"Authorization": f"Bearer {token}"}
+    lid = lead_ids.get("medium") if lead_ids else None
+    expected_price = 7.0
+    if not lid:
+        r = requests.get(f"{BASE}/leads/feed", headers=h, params={"zip": "10001", "radius": 50}, timeout=15)
+        leads = r.json().get("leads", [])
+        if not leads:
+            record("unlock:setup", False, "no lead")
+            return
+        lid = leads[0]["id"]
+        expected_price = leads[0].get("lead_price")
+
+    r = requests.post(f"{BASE}/leads/{lid}/unlock/create", headers=h, timeout=20)
+    data = safe_json(r)
+    ok = (
+        r.status_code == 200
+        and data.get("success")
+        and data.get("payment_id")
+        and (data.get("approval_url") or "").startswith("https://www.paypal.com")
+        and abs(data.get("amount", 0) - expected_price) < 0.01
+        and data.get("lead_id") == lid
+    )
+    record("unlock:POST /leads/{id}/unlock/create", ok,
+           f"status={r.status_code} amount={data.get('amount')} approval_url={data.get('approval_url','')[:50]}")
+
+    r2 = requests.post(f"{BASE}/leads/{lid}/unlock/create", headers=h, timeout=20)
+    d2 = safe_json(r2)
+    ok2 = r2.status_code == 200 and d2.get("payment_id") and d2.get("payment_id") != data.get("payment_id")
+    record("unlock:second create succeeds (no capture yet)", ok2,
+           f"status={r2.status_code} new_payment_id={d2.get('payment_id')}")
+
+    r3 = requests.post(f"{BASE}/leads/nonexistent-uuid/unlock/create", headers=h, timeout=15)
+    record("unlock:create unknown lead → 404", r3.status_code == 404, f"status={r3.status_code}")
+
+
+def test_my_unlocked(token):
+    h = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{BASE}/leads/my-unlocked", headers=h, timeout=15)
+    data = safe_json(r)
+    ok = r.status_code == 200 and "count" in data and "leads" in data
+    record("my-unlocked:GET /leads/my-unlocked", ok,
+           f"status={r.status_code} count={data.get('count')}")
+
+
+def inspect_db_lead(lead_id):
+    import asyncio
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    async def _run():
+        c = AsyncIOMotorClient("mongodb://localhost:27017")
+        db = c["test_database"]
+        return await db.leads.find_one({"id": lead_id})
+
+    return asyncio.new_event_loop().run_until_complete(_run())
+
+
+def test_db_state(lead_ids):
+    if not lead_ids or not lead_ids.get("small"):
+        record("db:lead state", False, "no lead_id to inspect")
+        return
+    ld = inspect_db_lead(lead_ids["small"])
+    ok = (
+        ld is not None
+        and ld.get("status") == "open"
+        and ld.get("max_unlocks") == 5
+        and ld.get("unlocked_by") == []
+        and ld.get("lat") is not None
+        and ld.get("lng") is not None
+    )
+    record("db:created lead has correct shape", ok,
+           f"status={ld.get('status') if ld else 'None'} max_unlocks={ld.get('max_unlocks') if ld else 'None'} lat={ld.get('lat') if ld else 'None'}")
+
 
 if __name__ == "__main__":
-    tester = ElectricalEstimatorAPITest()
-    success = tester.run_all_tests()
-    exit(0 if success else 1)
+    smoke()
+    token = login()
+    smoke_jobs(token)
+    zip_lookup()
+    verify_send_bad_channel()
+    verify_check_unknown()
+
+    em_v = verify_email_flow()
+    sm_v = verify_sms_flow()
+    if em_v:
+        verify_check_wrong_code(em_v)
+        verify_check_correct(em_v, "email")
+    if sm_v and sm_v.get("dev_code"):
+        verify_check_correct(sm_v, "sms")
+    verify_rate_limit()
+
+    lead_ids = post_lead_full_flow() or {}
+    test_lead_with_unverified()
+    test_feed(token, lead_ids)
+    test_lead_detail(token, lead_ids)
+    test_unlock_create(token, lead_ids)
+    test_my_unlocked(token)
+    test_db_state(lead_ids)
+
+    print(f"\n{'='*60}")
+    print(f"PASSED: {len(PASS)} / FAILED: {len(FAIL)}")
+    if FAIL:
+        print("\nFAILURES:")
+        for n, i in FAIL:
+            print(f"  - {n}: {i}")
+    sys.exit(0 if not FAIL else 1)

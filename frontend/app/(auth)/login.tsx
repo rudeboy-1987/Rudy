@@ -104,6 +104,21 @@ export default function LoginScreen() {
                 <Text style={styles.footerLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.postLeadBtn}
+              onPress={() => router.push('/post-lead')}
+            >
+              <Ionicons name="flash" size={18} color="#00ff66" />
+              <Text style={styles.postLeadText}>Have an electrical job? Post for free</Text>
+              <Ionicons name="arrow-forward" size={16} color="#00ff66" />
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -187,5 +202,38 @@ const styles = StyleSheet.create({
     color: '#f59e0b',
     fontSize: 14,
     fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#1f2937',
+  },
+  dividerText: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  postLeadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#00ff66',
+    backgroundColor: 'rgba(0,255,102,0.06)',
+  },
+  postLeadText: {
+    color: '#00ff66',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

@@ -145,6 +145,83 @@ export const jobsApi = {
   delete: (id: string) => api.delete(`/jobs/${id}`),
 };
 
+// ===== Live Lead Marketplace =====
+export interface Lead {
+  id: string;
+  poster_name: string;
+  poster_email: string;
+  poster_phone: string;
+  poster_type: string;
+  title: string;
+  description: string;
+  project_type: string;
+  urgency: string;
+  estimated_budget: number;
+  lead_price: number;
+  tier: string;
+  zip_code: string;
+  city?: string;
+  state?: string;
+  lat?: number;
+  lng?: number;
+  address?: string | null;
+  images: string[];
+  unlocked_by: string[];
+  max_unlocks: number;
+  unlock_count: number;
+  slots_remaining: number;
+  is_unlocked: boolean;
+  status: string;
+  distance_miles?: number | null;
+  created_at: string;
+}
+
+export interface LeadFeedResponse {
+  count: number;
+  radius_miles: number;
+  leads: Lead[];
+}
+
+export const leadsApi = {
+  // Public (no auth)
+  sendVerification: (channel: 'email' | 'sms', destination: string) =>
+    api.post('/leads/verify/send', { channel, destination }),
+  checkVerification: (verification_id: string, code: string) =>
+    api.post('/leads/verify/check', { verification_id, code }),
+  postLead: (data: {
+    poster_name: string;
+    poster_email: string;
+    poster_phone: string;
+    poster_type: string;
+    title: string;
+    description: string;
+    project_type: string;
+    urgency: string;
+    estimated_budget: number;
+    zip_code: string;
+    address?: string;
+    images?: string[];
+    email_verification_id: string;
+    sms_verification_id: string;
+  }) => api.post('/leads', data),
+  zipLookup: (zip: string) => api.get(`/leads-public/zip-lookup/${zip}`),
+
+  // Contractor (auth required)
+  feed: (params: {
+    zip?: string;
+    radius?: number;
+    project_type?: string;
+    urgency?: string;
+    min_budget?: number;
+    max_budget?: number;
+  }) => api.get<LeadFeedResponse>('/leads/feed', { params }),
+  getOne: (id: string) => api.get<Lead>(`/leads/${id}`),
+  myUnlocked: () => api.get<{ count: number; leads: Lead[] }>('/leads/my-unlocked'),
+  createUnlockOrder: (lead_id: string) => api.post(`/leads/${lead_id}/unlock/create`),
+  captureUnlock: (lead_id: string, payment_id: string, payer_id: string) =>
+    api.post(`/leads/${lead_id}/unlock/capture`, null, { params: { payment_id, payer_id } }),
+};
+
 // Subscription API
 export const subscriptionApi = {
   getStatus: () => api.get('/subscription/status'),
