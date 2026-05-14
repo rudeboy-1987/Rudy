@@ -648,10 +648,10 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressStepActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   progressStepCurrent: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   scrollContent: {
     padding: 16,
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   toggleActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   toggleText: {
     color: '#9ca3af',
@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     padding: 14,
     gap: 8,
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
   },
   summaryTotal: {
     borderTopWidth: 2,
-    borderTopColor: '#f59e0b',
+    borderTopColor: '#00ff66',
     marginTop: 8,
     paddingTop: 16,
   },
@@ -854,7 +854,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     padding: 16,
     gap: 8,

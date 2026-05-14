@@ -109,7 +109,7 @@ export default function BlueprintAnalyzerScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* AI Badge */}
           <View style={styles.aiBadge}>
-            <Ionicons name="sparkles" size={20} color="#f59e0b" />
+            <Ionicons name="sparkles" size={20} color="#00ff66" />
             <Text style={styles.aiBadgeText}>AI-Powered Analysis</Text>
           </View>
 
@@ -136,11 +136,11 @@ export default function BlueprintAnalyzerScreen() {
             ) : (
               <View style={styles.uploadOptions}>
                 <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-                  <Ionicons name="images-outline" size={32} color="#f59e0b" />
+                  <Ionicons name="images-outline" size={32} color="#00ff66" />
                   <Text style={styles.uploadButtonText}>Choose Photo</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.uploadButton} onPress={takePhoto}>
-                  <Ionicons name="camera-outline" size={32} color="#f59e0b" />
+                  <Ionicons name="camera-outline" size={32} color="#00ff66" />
                   <Text style={styles.uploadButtonText}>Take Photo</Text>
                 </TouchableOpacity>
               </View>
@@ -227,7 +227,7 @@ export default function BlueprintAnalyzerScreen() {
           {analysis && (
             <View style={styles.resultsSection}>
               <View style={styles.resultsHeader}>
-                <Ionicons name="document-text" size={24} color="#f59e0b" />
+                <Ionicons name="document-text" size={24} color="#00ff66" />
                 <Text style={styles.resultsTitle}>AI Analysis</Text>
               </View>
               <View style={styles.resultsCard}>
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(0, 255, 102, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 25,
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   aiBadgeText: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   toggleActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   toggleText: {
     color: '#9ca3af',
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 16,
     padding: 18,
     gap: 12,
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     padding: 16,
     gap: 8,

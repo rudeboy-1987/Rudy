@@ -57,7 +57,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#f59e0b" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00ff66" />}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -77,7 +77,7 @@ export default function DashboardScreen() {
               <Ionicons
                 name={subscription.tier === 'premium' ? 'star' : subscription.tier === 'basic' ? 'checkmark-circle' : 'gift'}
                 size={24}
-                color={subscription.tier === 'premium' ? '#f59e0b' : '#10b981'}
+                color={subscription.tier === 'premium' ? '#00ff66' : '#10b981'}
               />
               <View style={styles.subscriptionText}>
                 <Text style={styles.subscriptionTitle}>
@@ -110,7 +110,7 @@ export default function DashboardScreen() {
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, styles.statCardPrimary]}>
-            <Ionicons name="document-text" size={28} color="#f59e0b" />
+            <Ionicons name="document-text" size={28} color="#00ff66" />
             <Text style={styles.statNumber}>{estimates.length}</Text>
             <Text style={styles.statLabel}>Total Estimates</Text>
           </View>
@@ -139,8 +139,8 @@ export default function DashboardScreen() {
               style={styles.actionCard}
               onPress={() => router.push('/smart-estimate')}
             >
-              <View style={[styles.actionIcon, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                <Ionicons name="sparkles" size={28} color="#f59e0b" />
+              <View style={[styles.actionIcon, { backgroundColor: 'rgba(0, 255, 102, 0.1)' }]}>
+                <Ionicons name="sparkles" size={28} color="#00ff66" />
               </View>
               <Text style={styles.actionText}>Smart Estimate</Text>
             </TouchableOpacity>
@@ -197,8 +197,8 @@ export default function DashboardScreen() {
               >
                 <View style={styles.estimateHeader}>
                   <Text style={styles.estimateName}>{estimate.project_name}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: estimate.status === 'sent' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)' }]}>
-                    <Text style={[styles.statusText, { color: estimate.status === 'sent' ? '#10b981' : '#f59e0b' }]}>
+                  <View style={[styles.statusBadge, { backgroundColor: estimate.status === 'sent' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0, 255, 102, 0.1)' }]}>
+                    <Text style={[styles.statusText, { color: estimate.status === 'sent' ? '#10b981' : '#00ff66' }]}>
                       {estimate.status}
                     </Text>
                   </View>
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   upgradeBtn: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   },
   statCardPrimary: {
     borderWidth: 1,
-    borderColor: '#f59e0b',
+    borderColor: '#00ff66',
   },
   statNumber: {
     fontSize: 24,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   seeAll: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '500',
   },

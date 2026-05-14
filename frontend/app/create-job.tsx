@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   toggleActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   toggleText: {
     color: '#9ca3af',
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     padding: 18,
     gap: 10,

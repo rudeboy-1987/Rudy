@@ -110,7 +110,7 @@ export default function EstimateDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f59e0b" />
+          <ActivityIndicator size="large" color="#00ff66" />
         </View>
       </SafeAreaView>
     );
@@ -151,7 +151,7 @@ export default function EstimateDetailScreen() {
                     ? 'rgba(16, 185, 129, 0.1)'
                     : estimate.status === 'accepted'
                     ? 'rgba(59, 130, 246, 0.1)'
-                    : 'rgba(245, 158, 11, 0.1)',
+                    : 'rgba(0, 255, 102, 0.1)',
               },
             ]}
           >
@@ -169,7 +169,7 @@ export default function EstimateDetailScreen() {
                   ? '#10b981'
                   : estimate.status === 'accepted'
                   ? '#3b82f6'
-                  : '#f59e0b'
+                  : '#00ff66'
               }
             />
             <Text
@@ -181,7 +181,7 @@ export default function EstimateDetailScreen() {
                       ? '#10b981'
                       : estimate.status === 'accepted'
                       ? '#3b82f6'
-                      : '#f59e0b',
+                      : '#00ff66',
                 },
               ]}
             >
@@ -196,7 +196,7 @@ export default function EstimateDetailScreen() {
         {/* Project Info */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="document-text" size={24} color="#f59e0b" />
+            <Ionicons name="document-text" size={24} color="#00ff66" />
             <Text style={styles.cardTitle}>Project Details</Text>
           </View>
           <Text style={styles.projectName}>{estimate.project_name}</Text>
@@ -326,7 +326,7 @@ export default function EstimateDetailScreen() {
         {estimate.ai_analysis && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="sparkles" size={24} color="#f59e0b" />
+              <Ionicons name="sparkles" size={24} color="#00ff66" />
               <Text style={styles.cardTitle}>AI Generated Document</Text>
             </View>
             <Text style={styles.aiText}>{estimate.ai_analysis}</Text>
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   grandTotalRow: {
     borderTopWidth: 2,
-    borderTopColor: '#f59e0b',
+    borderTopColor: '#00ff66',
     marginTop: 8,
     paddingTop: 12,
   },
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   aiButton: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   aiButtonText: {
     color: '#000000',

@@ -69,7 +69,7 @@ export default function RegisterScreen() {
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Start your 1-month free trial</Text>
             <View style={styles.badge}>
-              <Ionicons name="gift-outline" size={16} color="#f59e0b" />
+              <Ionicons name="gift-outline" size={16} color="#00ff66" />
               <Text style={styles.badgeText}>30 Days Free!</Text>
             </View>
           </View>
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(0, 255, 102, 0.1)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   badgeText: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 6,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     height: 56,
     alignItems: 'center',
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   footerLink: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '600',
   },

@@ -117,7 +117,7 @@ export default function EditProfileScreen() {
           {/* Tips */}
           <View style={styles.tipsCard}>
             <View style={styles.tipsHeader}>
-              <Ionicons name="bulb" size={20} color="#f59e0b" />
+              <Ionicons name="bulb" size={20} color="#00ff66" />
               <Text style={styles.tipsTitle}>Profile Tips</Text>
             </View>
             <View style={styles.tipItem}>
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tipsTitle: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     padding: 16,
     gap: 8,

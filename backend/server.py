@@ -984,7 +984,7 @@ async def email_estimate(estimate_id: str, request: SendEstimateRequest, current
         html_content = f"""
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
-            <div style="background: #f59e0b; color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+            <div style="background: #00ff66; color: white; padding: 20px; border-radius: 10px 10px 0 0;">
                 <h1 style="margin: 0;">Electrical Estimate</h1>
                 <p style="margin: 5px 0 0 0;">{estimate.get('project_name')}</p>
             </div>
@@ -1007,8 +1007,8 @@ async def email_estimate(estimate_id: str, request: SendEstimateRequest, current
                     <p>Equipment: ${estimate.get('equipment_total', 0):.2f}</p>
                     <p>Overhead ({estimate.get('overhead_percentage', 10)}%): ${estimate.get('overhead_amount', 0):.2f}</p>
                     <p>Profit ({estimate.get('profit_percentage', 15)}%): ${estimate.get('profit_amount', 0):.2f}</p>
-                    <hr style="border-color: #f59e0b;">
-                    <h2 style="color: #f59e0b;">Grand Total: ${estimate.get('grand_total', 0):,.2f}</h2>
+                    <hr style="border-color: #00ff66;">
+                    <h2 style="color: #00ff66;">Grand Total: ${estimate.get('grand_total', 0):,.2f}</h2>
                 </div>
                 
                 {f"<div style='margin-top: 20px; padding: 15px; background: white; border-radius: 10px;'><p><strong>Message from contractor:</strong></p><p>{request.message}</p></div>" if request.message else ""}

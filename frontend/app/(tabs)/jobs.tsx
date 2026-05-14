@@ -152,7 +152,7 @@ export default function LeadsScreen() {
   const renderLead = ({ item }: { item: Lead }) => {
     const urgencyColor =
       item.urgency === 'emergency' ? '#ef4444' :
-      item.urgency === 'this_week' ? '#f59e0b' :
+      item.urgency === 'this_week' ? '#00ff66' :
       item.urgency === 'this_month' ? '#3b82f6' : '#6b7280';
 
     return (

@@ -91,7 +91,7 @@ export default function MaterialsScreen() {
   const renderMaterial = ({ item }: { item: MaterialPrice }) => (
     <View style={styles.materialCard}>
       <View style={styles.materialIcon}>
-        <Ionicons name={getCategoryIcon(item.category) as any} size={24} color="#f59e0b" />
+        <Ionicons name={getCategoryIcon(item.category) as any} size={24} color="#00ff66" />
       </View>
       <View style={styles.materialInfo}>
         <Text style={styles.materialName}>{item.name}</Text>
@@ -186,7 +186,7 @@ export default function MaterialsScreen() {
         renderItem={renderMaterial}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#f59e0b" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00ff66" />
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryChipActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   categoryChipText: {
     color: '#9ca3af',
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(0, 255, 102, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },

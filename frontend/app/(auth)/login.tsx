@@ -48,7 +48,7 @@ export default function LoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.logoContainer}>
-            <Ionicons name="flash" size={60} color="#f59e0b" />
+            <Ionicons name="flash" size={60} color="#00ff66" />
             <Text style={styles.title}>EstimatePro</Text>
             <Text style={styles.subtitle}>Sign in to your account</Text>
           </View>
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     height: 56,
     alignItems: 'center',
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   footerLink: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '600',
   },

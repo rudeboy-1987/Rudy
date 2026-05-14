@@ -87,7 +87,7 @@ export default function LeadDetail() {
 
   const urgencyColor =
     lead.urgency === 'emergency' ? '#ef4444' :
-    lead.urgency === 'this_week' ? '#f59e0b' :
+    lead.urgency === 'this_week' ? '#00ff66' :
     lead.urgency === 'this_month' ? '#3b82f6' : '#6b7280';
 
   const slotsRem = lead.slots_remaining;

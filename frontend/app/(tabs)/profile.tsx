@@ -83,7 +83,7 @@ export default function ProfileScreen() {
   const getTierBadge = () => {
     switch (user?.subscription_tier) {
       case 'premium':
-        return { label: 'Premium', color: '#f59e0b', icon: 'star' };
+        return { label: 'Premium', color: '#00ff66', icon: 'star' };
       case 'basic':
         return { label: 'Basic', color: '#10b981', icon: 'checkmark-circle' };
       default:
@@ -105,7 +105,7 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <TouchableOpacity style={styles.logoContainer} onPress={handleUploadLogo}>
             {uploading ? (
-              <ActivityIndicator size="large" color="#f59e0b" />
+              <ActivityIndicator size="large" color="#00ff66" />
             ) : user?.logo ? (
               <Image source={{ uri: user.logo }} style={styles.logoImage} />
             ) : (
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -379,13 +379,13 @@ const styles = StyleSheet.create({
   },
   planCardPremium: {
     borderWidth: 2,
-    borderColor: '#f59e0b',
+    borderColor: '#00ff66',
   },
   planCardActive: {
     opacity: 0.5,
   },
   popularBadge: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,

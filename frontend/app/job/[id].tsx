@@ -53,7 +53,7 @@ export default function JobDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f59e0b" />
+          <ActivityIndicator size="large" color="#00ff66" />
         </View>
       </SafeAreaView>
     );
@@ -119,7 +119,7 @@ export default function JobDetailScreen() {
           <Ionicons
             name={job.project_type === 'residential' ? 'home' : 'business'}
             size={14}
-            color="#f59e0b"
+            color="#00ff66"
           />
           <Text style={styles.typeText}>{job.project_type}</Text>
         </View>
@@ -150,7 +150,7 @@ export default function JobDetailScreen() {
         {/* Job Description */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="document-text" size={24} color="#f59e0b" />
+            <Ionicons name="document-text" size={24} color="#00ff66" />
             <Text style={styles.cardTitle}>Description</Text>
           </View>
           <Text style={styles.description}>{job.description}</Text>
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(0, 255, 102, 0.1)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   typeText: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '500',
     textTransform: 'capitalize',
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emailButton: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   emailButtonText: {
     color: '#000000',

@@ -222,7 +222,7 @@ export default function SmartEstimateScreen() {
     <>
       {/* AI Badge */}
       <View style={styles.aiBadge}>
-        <Ionicons name="sparkles" size={20} color="#f59e0b" />
+        <Ionicons name="sparkles" size={20} color="#00ff66" />
         <Text style={styles.aiBadgeText}>Smart AI Estimator</Text>
       </View>
 
@@ -349,7 +349,7 @@ Example: I need to rewire my kitchen with 6 GFCI outlets near the counters, 4 re
   const renderReviewStep = () => (
     <>
       <View style={styles.successBadge}>
-        <Ionicons name="create" size={24} color="#f59e0b" />
+        <Ionicons name="create" size={24} color="#00ff66" />
         <Text style={styles.successText}>Edit Your Estimate</Text>
       </View>
 
@@ -372,7 +372,7 @@ Example: I need to rewire my kitchen with 6 GFCI outlets near the counters, 4 re
       {/* Materials */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Ionicons name="construct" size={20} color="#f59e0b" />
+          <Ionicons name="construct" size={20} color="#00ff66" />
           <Text style={styles.cardHeaderTitle}>Materials</Text>
           <Text style={styles.cardHeaderTotal}>
             ${totals.materials.toFixed(2)}
@@ -435,7 +435,7 @@ Example: I need to rewire my kitchen with 6 GFCI outlets near the counters, 4 re
         ))}
         
         <TouchableOpacity style={styles.addItemButton} onPress={addMaterial}>
-          <Ionicons name="add-circle-outline" size={20} color="#f59e0b" />
+          <Ionicons name="add-circle-outline" size={20} color="#00ff66" />
           <Text style={styles.addItemText}>Add Material</Text>
         </TouchableOpacity>
       </View>
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(0, 255, 102, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 25,
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   aiBadgeText: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   toggleActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   toggleText: {
     color: '#9ca3af',
@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 16,
     padding: 18,
     gap: 12,
@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
   successBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(0, 255, 102, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 25,
@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   successText: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addItemText: {
-    color: '#f59e0b',
+    color: '#00ff66',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -967,7 +967,7 @@ const styles = StyleSheet.create({
   },
   grandTotalRow: {
     borderTopWidth: 2,
-    borderTopColor: '#f59e0b',
+    borderTopColor: '#00ff66',
     marginTop: 8,
     paddingTop: 16,
   },
@@ -1005,7 +1005,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     borderRadius: 12,
     padding: 16,
     gap: 8,

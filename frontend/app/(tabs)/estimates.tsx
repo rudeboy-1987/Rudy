@@ -96,7 +96,7 @@ export default function EstimatesScreen() {
           <Ionicons
             name={item.project_type === 'residential' ? 'home' : 'business'}
             size={20}
-            color="#f59e0b"
+            color="#00ff66"
           />
         </View>
         <View style={styles.cardInfo}>
@@ -112,7 +112,7 @@ export default function EstimatesScreen() {
                   ? 'rgba(16, 185, 129, 0.1)'
                   : item.status === 'accepted'
                   ? 'rgba(59, 130, 246, 0.1)'
-                  : 'rgba(245, 158, 11, 0.1)',
+                  : 'rgba(0, 255, 102, 0.1)',
             },
           ]}
         >
@@ -125,7 +125,7 @@ export default function EstimatesScreen() {
                     ? '#10b981'
                     : item.status === 'accepted'
                     ? '#3b82f6'
-                    : '#f59e0b',
+                    : '#00ff66',
               },
             ]}
           >
@@ -215,7 +215,7 @@ export default function EstimatesScreen() {
         renderItem={renderEstimate}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#f59e0b" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00ff66" />
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f2937',
   },
   filterTabActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
   },
   filterText: {
     color: '#9ca3af',
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: 'rgba(0, 255, 102, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   createButton: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#00ff66',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
