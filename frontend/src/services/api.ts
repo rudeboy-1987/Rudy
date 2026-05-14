@@ -5,6 +5,7 @@ const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
+  timeout: 180000, // 3 minutes — AI vision/blueprint analysis can take 30-90s
 });
 
 api.interceptors.request.use(async (config) => {

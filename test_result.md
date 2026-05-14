@@ -504,6 +504,30 @@ frontend:
         comment: "TESTED (16/16 passed in /app/backend_referral_test.py against public preview URL): (1) GET /api/auth/me returns referral_code 'ZQA5QA' — 6 chars, uppercase alphanumeric; two consecutive calls return the same code (persisted). (2) GET /api/leads-public/referral/ZQA5QA returns 200 with {referral_code, company_name='Elite Electrical Solutions LLC', logo}. /leads-public/referral/ZZZZZZ → 404. Lowercase 'zqa5qa' → 200 (case-insensitive lookup confirmed). (3) GET /api/leads/source-stats returns the expected shape {referral_code, total_leads, leads_last_30d, estimated_value}; without Authorization header → 403. (4) POST /api/leads with referral_code='ZQA5QA' + budget=600 → lead created with tier='medium', lead_price=7.0; subsequent GET /api/leads/{id} confirms source_ref_user_id == contractor.id and source_ref_code == 'ZQA5QA'. source-stats then shows total_leads incremented by 1 and estimated_value +$7. (5) POST /api/leads with referral_code='BADCODE' → lead still created (not rejected), source_ref_user_id=None, source_ref_code='BADCODE'; source-stats unchanged. (6) POST /api/leads without referral_code → lead created, source_ref_user_id=None; source-stats unchanged. (7) Route-ordering smoke test passed: GET /api/leads/{uuid_from_feed} returns the lead document (with id), NOT the source-stats payload, confirming /leads/source-stats is matched before /leads/{lead_id}."
 
 
+  - task: "Blueprint AI Vision (electrical-only, multi-image + PDF)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/ai/analyze-blueprint-v2 takes {project_type, project_description, images[], pdf_base64}. Server-side PDF→PNG conversion via PyMuPDF (first 5 pages). Strict electrical-only system prompt with refusal for non-electrical content. Returns structured JSON with counts (outlets/lights/panels/EV/etc), materials list, labor, equipment, NEC compliance notes, warnings, totals. Manual smoke test with text-only description returned 12 recessed lights, 1 main+1 sub panel, 1 EV charger, $14,206 grand total, 5 materials, 4 NEC notes. Companion POST /api/ai/blueprint-to-estimate converts the JSON into an editable estimate."
+
+  - task: "Facebook Page Auto-Post (Meta Graph API v19)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "4 endpoints: POST /api/social/facebook/connect (validates token against graph.facebook.com, stores), GET /api/social/facebook/status, POST /api/social/facebook/disconnect, POST /api/social/facebook/post (posts message + link to Page feed). Bogus token returns 400 with Meta's OAuthException code 190 — validation works. User provides their own Page ID + Page Access Token via /connect-facebook UI."
+
   test_sequence: 2
   run_ui: false
 

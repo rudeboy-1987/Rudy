@@ -200,6 +200,24 @@ export default function GrowScreen() {
 
         {/* QR Code poster */}
         <View style={styles.card}>
+          <Text style={styles.sectionLabel}>Auto-post to your channels</Text>
+          <TouchableOpacity
+            style={styles.fbConnectBtn}
+            onPress={() => router.push('/connect-facebook')}
+          >
+            <View style={styles.fbIcon}>
+              <Ionicons name="logo-facebook" size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fbBtnTitle}>Facebook Page auto-post</Text>
+              <Text style={styles.fbBtnSub}>Connect once → every new lead posts to your Page</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </TouchableOpacity>
+        </View>
+
+        {/* QR Code poster */}
+        <View style={styles.card}>
           <Text style={styles.sectionLabel}>Printable QR poster</Text>
           <Text style={styles.helperHint}>
             Print or screenshot this and stick it on your truck, jobsite signs, or business cards.
@@ -371,4 +389,16 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: '#00ff66', fontWeight: '700' },
 
   disclaimer: { color: '#6b7280', fontSize: 12, textAlign: 'center', marginTop: 8 },
+
+  fbConnectBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#0a0a0a', borderRadius: 10, padding: 12,
+    borderWidth: 1, borderColor: '#1877F2',
+  },
+  fbIcon: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#1877F2',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  fbBtnTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  fbBtnSub: { color: '#9ca3af', fontSize: 11, marginTop: 2 },
 });

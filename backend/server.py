@@ -529,6 +529,362 @@ async def send_estimate(estimate_id: str, request: SendEstimateRequest, current_
 
 # ===================== AI ANALYSIS ENDPOINTS =====================
 
+# --- PDF → images helper ---
+def pdf_pages_to_base64_images(pdf_b64: str, max_pages: int = 5, dpi: int = 150) -> List[str]:
+    """Render up to `max_pages` of a base64-encoded PDF to base64 PNG images."""
+    try:
+        import fitz  # PyMuPDF
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail="PDF processing not available")
+    try:
+        pdf_bytes = base64.b64decode(pdf_b64)
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid PDF: {e}")
+    pages = []
+    zoom = dpi / 72.0
+    mat = fitz.Matrix(zoom, zoom)
+    for i in range(min(len(doc), max_pages)):
+        pix = doc.load_page(i).get_pixmap(matrix=mat, alpha=False)
+        png_bytes = pix.tobytes("png")
+        pages.append(base64.b64encode(png_bytes).decode("ascii"))
+    doc.close()
+    return pages
+
+
+class BlueprintAnalyzeV2Request(BaseModel):
+    project_type: str = "residential"
+    project_description: Optional[str] = ""
+    images: List[str] = []  # base64 (no data: prefix)
+    pdf_base64: Optional[str] = None  # if provided, server converts to images
+
+
+ELECTRICAL_VISION_SYSTEM = """You are EstimatePro's senior electrical-estimator AI with 25 years of NEC-compliant residential and commercial electrical experience. You analyze blueprints, floor plans, riser diagrams, panel schedules, and site photos to produce precise, line-item electrical material and labor estimates.
+
+STRICT SCOPE — ELECTRICAL ONLY:
+- If the image is NOT a blueprint, electrical drawing, or jobsite photo of electrical work (e.g. random photos, food, faces, non-electrical scenes), refuse with {"refused": true, "reason": "..."} and stop.
+- DO NOT estimate plumbing, HVAC mechanical, framing, drywall, paint, or other trades. Only call out HVAC/EV/appliance items because they require electrical connections.
+
+WHAT TO IDENTIFY:
+1. Outlets / receptacles (standard 120V, GFCI required at kitchen/bath/garage/outdoor/laundry, AFCI required in living areas per NEC 210.12, dedicated 20A circuits, USB outlets, floor outlets)
+2. Switches (single-pole, 3-way, 4-way, dimmers, occupancy/smart switches)
+3. Lighting fixtures by type (recessed, surface, pendant, sconce, fluorescent, LED tube, exit/emergency)
+4. Service & panel (amp rating, main vs subpanel, breaker count by amperage, dedicated circuits, EV charger 240V breakers)
+5. Conduit & wire runs (EMT/PVC, wire gauge AWG, romex vs THHN, approximate footage)
+6. Boxes (junction, outlet, switch, ceiling fan rated, weatherproof)
+7. Special systems (smoke/CO detectors interconnected per NEC 314.27, doorbell, low-voltage, security, network drops, AV)
+8. Heavy loads (electric range, dryer, water heater, AC condenser, EV charger, mini-split, hot tub)
+9. Emergency / egress lighting (commercial)
+10. NEC compliance flags (tamper-resistant receptacles in dwellings, weather-resistant outdoors, GFCI/AFCI requirements, working clearances per 110.26)
+
+OUTPUT FORMAT — STRICT JSON ONLY, NO PROSE OUTSIDE JSON:
+{
+  "refused": false,
+  "blueprint_kind": "floor_plan" | "riser_diagram" | "panel_schedule" | "site_photo" | "elevation" | "single_line",
+  "project_type": "residential" | "commercial",
+  "scale_detected": "1/4\\" = 1'" | null,
+  "summary": "short human-readable summary of what was found",
+  "counts": {
+    "outlets_standard": int,
+    "outlets_gfci": int,
+    "outlets_afci_protected": int,
+    "outlets_dedicated_20a": int,
+    "switches_single_pole": int,
+    "switches_3way": int,
+    "dimmers": int,
+    "recessed_lights": int,
+    "surface_lights": int,
+    "pendant_lights": int,
+    "ceiling_fans": int,
+    "smoke_co_detectors": int,
+    "exhaust_fans": int,
+    "panels_main": int,
+    "panels_sub": int,
+    "ev_chargers": int
+  },
+  "materials": [
+    {"name": "string", "category": "outlets|switches|lighting|panel|wire|conduit|box|device|special", "quantity": number, "unit": "ea|ft|roll|box", "unit_price_estimate_usd": number, "subtotal_usd": number, "notes": "string"}
+  ],
+  "labor": [
+    {"task": "string", "hours": number, "rate_usd_per_hour": number, "subtotal_usd": number}
+  ],
+  "equipment": [
+    {"name": "string", "duration_days": number, "rental_cost_usd": number}
+  ],
+  "totals": {
+    "materials_subtotal_usd": number,
+    "labor_subtotal_usd": number,
+    "equipment_subtotal_usd": number,
+    "overhead_15pct_usd": number,
+    "profit_10pct_usd": number,
+    "grand_total_usd": number
+  },
+  "code_compliance_notes": ["string with NEC reference"],
+  "warnings": ["safety or scope clarification needed"],
+  "missing_info_needed": ["what would make this estimate more accurate"]
+}
+
+RULES:
+- Use realistic 2025 USA prices for materials & labor ($65–$95/hr typical journeyman rate).
+- Round monetary values to nearest cent.
+- Counts must be integers; if uncertain, set to 0 and add a `missing_info_needed` entry.
+- Do NOT invent items not visible/implied by the drawing.
+- If multiple images are provided, treat them as pages of the same project and aggregate counts.
+"""
+
+
+@api_router.post("/ai/analyze-blueprint-v2")
+async def analyze_blueprint_v2(request: BlueprintAnalyzeV2Request, current_user: dict = Depends(get_current_user)):
+    """Advanced electrical-only blueprint analysis. Accepts a list of image pages OR a PDF.
+    Returns strict JSON with counts, materials, labor, totals, code notes."""
+    try:
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="AI service not configured")
+
+        # Combine images + PDF pages
+        all_pages = list(request.images or [])
+        if request.pdf_base64:
+            all_pages.extend(pdf_pages_to_base64_images(request.pdf_base64, max_pages=5))
+
+        if not all_pages and not (request.project_description or "").strip():
+            raise HTTPException(status_code=400, detail="Provide at least one image, PDF, or project description")
+
+        # Limit to first 5 pages for cost control
+        all_pages = all_pages[:5]
+
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"blueprint-v2-{current_user['id']}-{uuid.uuid4()}",
+            system_message=ELECTRICAL_VISION_SYSTEM,
+        ).with_model("openai", "gpt-4o")
+
+        prompt_lines = [
+            f"Project type: {request.project_type}",
+            f"Description from contractor: {request.project_description or '(none provided)'}",
+            f"Number of blueprint pages attached: {len(all_pages)}",
+            "",
+            "Return ONLY the JSON object specified in the system message. No markdown fencing, no extra text.",
+        ]
+        message_text = "\n".join(prompt_lines)
+
+        if all_pages:
+            image_contents = [ImageContent(image_base64=p) for p in all_pages]
+            user_message = UserMessage(text=message_text, images=image_contents)
+        else:
+            user_message = UserMessage(text=message_text)
+
+        raw = await chat.send_message(user_message)
+
+        # Strip markdown fences if any
+        text = (raw or "").strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            if text.lower().startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        # Find the JSON object envelope
+        start = text.find('{')
+        end = text.rfind('}')
+        if start == -1 or end == -1:
+            return {"refused": True, "reason": "Model did not return JSON", "raw": raw}
+        try:
+            parsed = json.loads(text[start:end + 1])
+        except Exception as e:
+            return {"refused": True, "reason": f"JSON parse error: {e}", "raw": raw}
+
+        # Persist for audit/history
+        analysis_doc = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user["id"],
+            "project_type": request.project_type,
+            "project_description": request.project_description,
+            "pages_count": len(all_pages),
+            "result": parsed,
+            "created_at": datetime.utcnow(),
+        }
+        await db.blueprint_analyses.insert_one(analysis_doc)
+        parsed["analysis_id"] = analysis_doc["id"]
+
+        return parsed
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"AI v2 analysis error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {e}")
+
+
+@api_router.post("/ai/blueprint-to-estimate")
+async def blueprint_to_estimate(payload: Dict[str, Any], current_user: dict = Depends(get_current_user)):
+    """Convert a successful blueprint v2 analysis into a saved editable estimate."""
+    analysis = payload.get("analysis")
+    client_name = (payload.get("client_name") or "").strip() or "New Client"
+    project_name = (payload.get("project_name") or "").strip() or "Blueprint Estimate"
+    if not analysis or analysis.get("refused"):
+        raise HTTPException(status_code=400, detail="No valid analysis provided")
+
+    materials = []
+    for m in analysis.get("materials", []):
+        materials.append({
+            "name": m.get("name", "Item"),
+            "category": m.get("category", "other"),
+            "quantity": float(m.get("quantity", 0) or 0),
+            "unit": m.get("unit", "ea"),
+            "unit_price": float(m.get("unit_price_estimate_usd", 0) or 0),
+            "total": float(m.get("subtotal_usd", 0) or 0),
+            "notes": m.get("notes", ""),
+        })
+    labor = []
+    for l in analysis.get("labor", []):
+        labor.append({
+            "task": l.get("task", "Labor"),
+            "hours": float(l.get("hours", 0) or 0),
+            "rate": float(l.get("rate_usd_per_hour", 0) or 0),
+            "total": float(l.get("subtotal_usd", 0) or 0),
+        })
+    equipment = []
+    for e in analysis.get("equipment", []):
+        equipment.append({
+            "name": e.get("name", "Equipment"),
+            "days": float(e.get("duration_days", 0) or 0),
+            "rate": float(e.get("rental_cost_usd", 0) or 0),
+            "total": float(e.get("rental_cost_usd", 0) or 0),
+        })
+
+    totals = analysis.get("totals", {}) or {}
+    grand_total = float(totals.get("grand_total_usd") or sum(m["total"] for m in materials) + sum(l["total"] for l in labor) + sum(e["total"] for e in equipment))
+
+    est_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": current_user["id"],
+        "client_name": client_name,
+        "client_email": payload.get("client_email") or "",
+        "project_name": project_name,
+        "project_type": analysis.get("project_type", "residential"),
+        "status": "draft",
+        "materials": materials,
+        "labor": labor,
+        "equipment": equipment,
+        "total_materials": float(totals.get("materials_subtotal_usd") or sum(m["total"] for m in materials)),
+        "total_labor": float(totals.get("labor_subtotal_usd") or sum(l["total"] for l in labor)),
+        "total_equipment": float(totals.get("equipment_subtotal_usd") or sum(e["total"] for e in equipment)),
+        "overhead_amount": float(totals.get("overhead_15pct_usd") or 0),
+        "profit_amount": float(totals.get("profit_10pct_usd") or 0),
+        "grand_total": grand_total,
+        "ai_summary": analysis.get("summary", ""),
+        "code_notes": analysis.get("code_compliance_notes", []),
+        "blueprint_analysis_id": analysis.get("analysis_id"),
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+    await db.estimates.insert_one(est_doc)
+    est_doc.pop("_id", None)
+    return {"success": True, "estimate_id": est_doc["id"], "estimate": est_doc}
+
+
+# ===================== SOCIAL — FACEBOOK PAGE AUTO-POST =====================
+
+class FacebookConnectRequest(BaseModel):
+    page_id: str
+    page_access_token: str
+    page_name: Optional[str] = None
+    auto_post_new_leads: bool = False
+
+
+@api_router.post("/social/facebook/connect")
+async def facebook_connect(req: FacebookConnectRequest, current_user: dict = Depends(get_current_user)):
+    """Store the contractor's Facebook Page credentials and validate by hitting Graph API /me."""
+    import httpx
+    # Validate token
+    try:
+        async with httpx.AsyncClient(timeout=10) as client_h:
+            r = await client_h.get(
+                f"https://graph.facebook.com/v19.0/{req.page_id}",
+                params={"fields": "id,name,access_token,fan_count", "access_token": req.page_access_token},
+            )
+        if r.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Facebook validation failed: {r.text[:200]}")
+        page_info = r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not reach Facebook: {e}")
+
+    doc = {
+        "user_id": current_user["id"],
+        "provider": "facebook",
+        "page_id": req.page_id,
+        "page_name": page_info.get("name") or req.page_name,
+        "access_token": req.page_access_token,
+        "auto_post_new_leads": req.auto_post_new_leads,
+        "connected_at": datetime.utcnow(),
+        "fan_count": page_info.get("fan_count"),
+    }
+    await db.social_connections.update_one(
+        {"user_id": current_user["id"], "provider": "facebook"},
+        {"$set": doc},
+        upsert=True,
+    )
+    return {
+        "success": True,
+        "page_id": req.page_id,
+        "page_name": doc["page_name"],
+        "fan_count": doc.get("fan_count"),
+        "auto_post_new_leads": req.auto_post_new_leads,
+    }
+
+
+@api_router.get("/social/facebook/status")
+async def facebook_status(current_user: dict = Depends(get_current_user)):
+    conn = await db.social_connections.find_one({"user_id": current_user["id"], "provider": "facebook"})
+    if not conn:
+        return {"connected": False}
+    return {
+        "connected": True,
+        "page_id": conn["page_id"],
+        "page_name": conn.get("page_name"),
+        "fan_count": conn.get("fan_count"),
+        "auto_post_new_leads": conn.get("auto_post_new_leads", False),
+        "connected_at": conn.get("connected_at", "").isoformat() if conn.get("connected_at") else None,
+    }
+
+
+@api_router.post("/social/facebook/disconnect")
+async def facebook_disconnect(current_user: dict = Depends(get_current_user)):
+    await db.social_connections.delete_one({"user_id": current_user["id"], "provider": "facebook"})
+    return {"success": True}
+
+
+@api_router.post("/social/facebook/post")
+async def facebook_post(payload: Dict[str, Any], current_user: dict = Depends(get_current_user)):
+    """Post a message (and optional link) to the contractor's Facebook Page."""
+    import httpx
+    conn = await db.social_connections.find_one({"user_id": current_user["id"], "provider": "facebook"})
+    if not conn:
+        raise HTTPException(status_code=400, detail="Facebook not connected. Connect your Page first.")
+    message = (payload.get("message") or "").strip()
+    link = (payload.get("link") or "").strip() or None
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required")
+
+    data = {"message": message, "access_token": conn["access_token"]}
+    if link:
+        data["link"] = link
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client_h:
+            r = await client_h.post(f"https://graph.facebook.com/v19.0/{conn['page_id']}/feed", data=data)
+        if r.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Facebook post failed: {r.text[:200]}")
+        result = r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Facebook unreachable: {e}")
+
+    return {"success": True, "post_id": result.get("id"), "url": f"https://facebook.com/{result.get('id')}" if result.get("id") else None}
+
+
 @api_router.post("/ai/analyze-blueprint")
 async def analyze_blueprint(request: AIAnalysisRequest, current_user: dict = Depends(get_current_user)):
     try:

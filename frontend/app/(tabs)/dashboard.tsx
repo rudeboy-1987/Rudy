@@ -173,12 +173,12 @@ export default function DashboardScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => router.push('/blueprint-analyzer')}
+              onPress={() => router.push('/blueprint-vision')}
             >
               <View style={[styles.actionIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
                 <Ionicons name="scan" size={28} color="#3b82f6" />
               </View>
-              <Text style={styles.actionText}>Analyze Blueprint</Text>
+              <Text style={styles.actionText}>Blueprint AI Vision</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionCard}
