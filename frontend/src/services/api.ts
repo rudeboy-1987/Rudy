@@ -203,8 +203,14 @@ export const leadsApi = {
     images?: string[];
     email_verification_id: string;
     sms_verification_id: string;
+    referral_code?: string;
   }) => api.post('/leads', data),
   zipLookup: (zip: string) => api.get(`/leads-public/zip-lookup/${zip}`),
+  referralLookup: (code: string) => api.get(`/leads-public/referral/${code}`),
+  sourceStats: () =>
+    api.get<{ referral_code: string | null; total_leads: number; leads_last_30d: number; estimated_value: number }>(
+      '/leads/source-stats'
+    ),
 
   // Contractor (auth required)
   feed: (params: {

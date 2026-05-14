@@ -131,6 +131,24 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* Grow your business CTA */}
+        <TouchableOpacity
+          style={styles.growBanner}
+          onPress={() => router.push('/grow')}
+          activeOpacity={0.9}
+        >
+          <View style={styles.growIconBox}>
+            <Ionicons name="megaphone" size={26} color="#000" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.growTitle}>Grow your business 🚀</Text>
+            <Text style={styles.growSubtitle}>
+              Share your link & QR code to get new leads from social media, jobsites, and your own customers.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color="#00ff66" />
+        </TouchableOpacity>
+
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -337,6 +355,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  growBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(0,255,102,0.1)',
+    borderColor: '#00ff66',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  growIconBox: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: '#00ff66', alignItems: 'center', justifyContent: 'center',
+  },
+  growTitle: { color: '#00ff66', fontSize: 15, fontWeight: '800' },
+  growSubtitle: { color: '#9ca3af', fontSize: 12, marginTop: 2, lineHeight: 16 },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -488,9 +488,22 @@ frontend:
         agent: "main"
         comment: "Contractor inbox of leads they paid to unlock with quick call/text/email buttons."
 
-metadata:
-  created_by: "main_agent"
-  version: "1.1"
+  - task: "Live Lead Marketplace - Referral / Lead Acquisition Kit"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Every contractor gets an auto-generated 6-char alphanumeric referral_code on register (backfilled on /auth/me for older users). Public endpoint GET /api/leads-public/referral/{code} returns company info for the post-lead landing. POST /api/leads accepts optional referral_code and stores source_ref_user_id + source_ref_code on the lead. GET /api/leads/source-stats returns {referral_code, total_leads, leads_last_30d, estimated_value}. End-to-end manual test confirmed: posted lead via ref ZQA5QA → source-stats reflected total_leads=1, est_value=$7. Frontend has new /grow screen with QR code (react-native-qrcode-svg), copy buttons, system Share API, one-tap channels (Facebook/Twitter/WhatsApp/SMS/Email/Instagram), ready-to-paste copy, and a printable QR poster. Post-lead screen reads ?ref= param and shows 'Sent via [Company]' banner."
+      - working: true
+        agent: "testing"
+        comment: "TESTED (16/16 passed in /app/backend_referral_test.py against public preview URL): (1) GET /api/auth/me returns referral_code 'ZQA5QA' — 6 chars, uppercase alphanumeric; two consecutive calls return the same code (persisted). (2) GET /api/leads-public/referral/ZQA5QA returns 200 with {referral_code, company_name='Elite Electrical Solutions LLC', logo}. /leads-public/referral/ZZZZZZ → 404. Lowercase 'zqa5qa' → 200 (case-insensitive lookup confirmed). (3) GET /api/leads/source-stats returns the expected shape {referral_code, total_leads, leads_last_30d, estimated_value}; without Authorization header → 403. (4) POST /api/leads with referral_code='ZQA5QA' + budget=600 → lead created with tier='medium', lead_price=7.0; subsequent GET /api/leads/{id} confirms source_ref_user_id == contractor.id and source_ref_code == 'ZQA5QA'. source-stats then shows total_leads incremented by 1 and estimated_value +$7. (5) POST /api/leads with referral_code='BADCODE' → lead still created (not rejected), source_ref_user_id=None, source_ref_code='BADCODE'; source-stats unchanged. (6) POST /api/leads without referral_code → lead created, source_ref_user_id=None; source-stats unchanged. (7) Route-ordering smoke test passed: GET /api/leads/{uuid_from_feed} returns the lead document (with id), NOT the source-stats payload, confirming /leads/source-stats is matched before /leads/{lead_id}."
+
+
   test_sequence: 2
   run_ui: false
 
@@ -509,5 +522,7 @@ agent_communication:
     message: "Initial implementation complete. MVP electrical estimator app with auth, estimates, AI analysis, materials database, job board, and profile management. Backend APIs tested with curl - all working. Frontend screenshots show login, registration, and dashboard working. Need comprehensive backend testing."
   - agent: "main"
     message: "NEW FEATURE: Live Lead Marketplace added. Backend has 8 new endpoints (verify/send, verify/check, leads POST, leads/feed, leads/{id}, leads/my-unlocked, unlock/create, unlock/capture, plus zip-lookup public helper). Database has 5 demo leads pre-seeded in NYC area (zips 10001, 10002, 10128, 11201, 07030). Test contractor: test@contractor.com / test123456."
+  - agent: "testing"
+    message: "REFERRAL / LEAD-ACQUISITION ENDPOINTS — 16/16 tests passed in /app/backend_referral_test.py against the public preview URL. Verified: GET /api/auth/me returns persistent referral_code (6-char uppercase alphanumeric); GET /api/leads-public/referral/{code} returns 200 for valid (case-insensitive) and 404 for invalid; GET /api/leads/source-stats returns expected shape and requires auth (403 without token); POST /api/leads with valid referral_code attributes the lead (source_ref_user_id + source_ref_code) and bumps source-stats by +1 lead and +$7; invalid/missing referral_code creates the lead but leaves source_ref_user_id=None and stats unchanged. Route-ordering smoke test confirmed GET /api/leads/{uuid_from_feed} still returns the lead document (not the source-stats payload). No regressions found. The contractor's referral_code on the seeded test account is ZQA5QA."
   - agent: "testing"
     message: "BACKEND TESTING COMPLETE — Live Lead Marketplace endpoints fully verified. 32/32 tests passed in /app/backend_test.py against the public preview URL. Results: (1) zip-lookup: valid US zips return city/state/lat/lng; 00000 → 404. (2) verify/send: email returns dev_code with delivery_mode=email_not_configured; SMS to fake/unverified numbers returns dev_code with delivery_mode=twilio_failed (Twilio rejects gracefully with 21211/21608); bad channel → 400. (3) verify/check: correct code → success+verified; wrong → 400; unknown id → 404; 6th wrong attempt → 429. (4) POST /leads: rejects unverified, mismatched email, and invalid zip with 400; valid creates with correct tier pricing ($5/$7/$10); DB entry has status=open, max_unlocks=5, unlocked_by=[], lat/lng populated. (5) /leads/feed: masks email/phone/last-name, populates distance_miles, sorts by distance ASC; radius=500 clamps to 200; radius=1 from 10001 returns only 10001 leads; project_type filter works. (6) GET /leads/{id} returns masked detail; unknown → 404. (7) /unlock/create returns LIVE PayPal approval_url (https://www.paypal.com/cgi-bin/webscr?cmd=_express...), correct amount, lead_id; calling twice succeeds with distinct payment_ids; unknown lead → 404. (8) /my-unlocked returns count=0 for fresh contractor. Smoke tests on /auth/login, /jobs, /materials/prices also pass. The capture endpoint was NOT exercised (requires real PayerID from PayPal flow per instructions)."

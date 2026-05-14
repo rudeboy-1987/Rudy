@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { leadsApi } from '../src/services/api';
@@ -39,8 +39,12 @@ const POSTER = [
 
 export default function PostLeadScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ ref?: string }>();
+  const refCode = (Array.isArray(params.ref) ? params.ref[0] : params.ref) || '';
+
   const [step, setStep] = useState<Step>('project');
   const [loading, setLoading] = useState(false);
+  const [referralCompany, setReferralCompany] = useState<string | null>(null);
 
   // Project info
   const [title, setTitle] = useState('');
@@ -67,6 +71,20 @@ export default function PostLeadScreen() {
   const [smsDevCode, setSmsDevCode] = useState('');
   const [emailDelivered, setEmailDelivered] = useState(false);
   const [smsDelivered, setSmsDelivered] = useState(false);
+
+  // Look up referral code on mount
+  useEffect(() => {
+    (async () => {
+      if (refCode && refCode.length >= 4) {
+        try {
+          const res = await leadsApi.referralLookup(refCode.toUpperCase());
+          setReferralCompany(res.data.company_name || null);
+        } catch {
+          setReferralCompany(null);
+        }
+      }
+    })();
+  }, [refCode]);
 
   const lookupZip = async (z: string) => {
     const cleaned = z.replace(/\D/g, '').slice(0, 5);
@@ -191,6 +209,7 @@ export default function PostLeadScreen() {
         images,
         email_verification_id: emailVerifId,
         sms_verification_id: smsVerifId,
+        referral_code: refCode ? refCode.toUpperCase() : undefined,
       });
       setStep('success');
     } catch (e: any) {
@@ -216,6 +235,20 @@ export default function PostLeadScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          {referralCompany && step !== 'success' ? (
+            <View style={styles.refBanner}>
+              <View style={styles.refIcon}>
+                <Ionicons name="flash" size={16} color="#00ff66" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.refTitle}>Sent via {referralCompany}</Text>
+                <Text style={styles.refSubtitle}>
+                  Your job will be visible to {referralCompany} and up to 4 other verified electricians in your area.
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
           {/* Progress */}
           <View style={styles.progressBar}>
             {['project', 'contact', 'verify_email', 'verify_sms'].map((s, i, arr) => {
@@ -533,6 +566,20 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
   scroll: { padding: 16, paddingBottom: 60 },
+
+  refBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(0,255,102,0.08)',
+    borderColor: '#00ff66', borderWidth: 1,
+    padding: 12, borderRadius: 12, marginBottom: 14,
+  },
+  refIcon: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,255,102,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  refTitle: { color: '#00ff66', fontWeight: '800', fontSize: 14 },
+  refSubtitle: { color: '#9ca3af', fontSize: 11, marginTop: 2 },
 
   progressBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 8 },
   progressStep: {

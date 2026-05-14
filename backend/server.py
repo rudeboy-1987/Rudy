@@ -305,6 +305,15 @@ async def register(user: UserCreate):
     now = datetime.utcnow()
     trial_end = now + timedelta(days=30)
     
+    # Generate unique 6-char alphanumeric referral code
+    import string, secrets
+    def gen_ref():
+        return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    ref_code = gen_ref()
+    # Ensure uniqueness
+    while await db.users.find_one({"referral_code": ref_code}):
+        ref_code = gen_ref()
+
     user_doc = {
         "id": user_id,
         "email": user.email.lower(),
@@ -316,6 +325,7 @@ async def register(user: UserCreate):
         "subscription_tier": "free_trial",
         "subscription_start": now,
         "trial_end": trial_end,
+        "referral_code": ref_code,
         "created_at": now
     }
     
@@ -354,6 +364,18 @@ async def login(credentials: UserLogin):
 
 @api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
+    # Backfill referral code if missing (for users created before the feature)
+    ref = current_user.get("referral_code")
+    if not ref:
+        import string, secrets
+        def gen_ref():
+            return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+        ref = gen_ref()
+        while await db.users.find_one({"referral_code": ref}):
+            ref = gen_ref()
+        await db.users.update_one({"id": current_user["id"]}, {"$set": {"referral_code": ref}})
+        current_user["referral_code"] = ref
+
     return {
         "id": current_user["id"],
         "email": current_user["email"],
@@ -362,6 +384,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "bio": current_user.get("bio"),
         "logo": current_user.get("logo"),
         "subscription_tier": current_user.get("subscription_tier", "free_trial"),
+        "referral_code": ref,
         "trial_end": current_user.get("trial_end", "").isoformat() if current_user.get("trial_end") else None,
         "created_at": current_user.get("created_at", "").isoformat() if current_user.get("created_at") else None
     }
@@ -1145,6 +1168,7 @@ class LeadCreate(BaseModel):
     images: List[str] = []  # base64
     email_verification_id: Optional[str] = None
     sms_verification_id: Optional[str] = None
+    referral_code: Optional[str] = None  # contractor referral code attribution
 
 class VerificationSendRequest(BaseModel):
     channel: str  # "email" or "sms"
@@ -1417,6 +1441,13 @@ async def post_lead(lead: LeadCreate):
 
     pricing = calculate_lead_price(lead.estimated_budget)
 
+    # Track referral attribution if provided
+    source_ref_user_id = None
+    if lead.referral_code:
+        ref_user = await db.users.find_one({"referral_code": lead.referral_code.upper().strip()})
+        if ref_user:
+            source_ref_user_id = ref_user["id"]
+
     lead_doc = {
         "id": str(uuid.uuid4()),
         "poster_name": lead.poster_name.strip(),
@@ -1442,6 +1473,8 @@ async def post_lead(lead: LeadCreate):
         "unlocked_by": [],
         "max_unlocks": 5,
         "status": "open",  # open, locked (5 unlocks reached), closed
+        "source_ref_user_id": source_ref_user_id,
+        "source_ref_code": (lead.referral_code or "").upper() or None,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
     }
@@ -1524,6 +1557,31 @@ async def my_unlocked_leads(current_user: dict = Depends(get_current_user)):
         ld["unlock_count"] = len(ld.get("unlocked_by", []))
         out.append(ld)
     return {"count": len(out), "leads": out}
+
+
+@api_router.get("/leads/source-stats")
+async def lead_source_stats(current_user: dict = Depends(get_current_user)):
+    """Return acquisition stats for the contractor's referral link."""
+    code = current_user.get("referral_code")
+    if not code:
+        return {"referral_code": None, "total_leads": 0, "leads_last_30d": 0, "estimated_value": 0.0}
+    total = await db.leads.count_documents({"source_ref_user_id": current_user["id"]})
+    since = datetime.utcnow() - timedelta(days=30)
+    recent = await db.leads.count_documents({
+        "source_ref_user_id": current_user["id"],
+        "created_at": {"$gte": since},
+    })
+    agg = await db.leads.aggregate([
+        {"$match": {"source_ref_user_id": current_user["id"]}},
+        {"$group": {"_id": None, "value": {"$sum": "$lead_price"}}},
+    ]).to_list(1)
+    value = float(agg[0]["value"]) if agg else 0.0
+    return {
+        "referral_code": code,
+        "total_leads": total,
+        "leads_last_30d": recent,
+        "estimated_value": round(value, 2),
+    }
 
 
 @api_router.get("/leads/{lead_id}")
@@ -1669,6 +1727,19 @@ async def public_zip_lookup(zip_code: str):
     if not info.get("lat"):
         raise HTTPException(status_code=404, detail="Zip not found")
     return info
+
+
+@api_router.get("/leads-public/referral/{code}")
+async def public_referral_lookup(code: str):
+    """Public endpoint: given a referral code, return minimal contractor info to show on the post-lead landing."""
+    user = await db.users.find_one({"referral_code": code.upper().strip()})
+    if not user:
+        raise HTTPException(status_code=404, detail="Referral code not found")
+    return {
+        "referral_code": user["referral_code"],
+        "company_name": user.get("company_name"),
+        "logo": user.get("logo"),
+    }
 
 
 # ===================== JOB BOARD ENDPOINTS =====================
