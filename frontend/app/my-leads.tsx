@@ -51,9 +51,11 @@ export default function MyLeadsScreen() {
     >
       <View style={styles.cardTop}>
         <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <View style={styles.unlockedPill}>
-          <Ionicons name="lock-open" size={12} color="#00ff66" />
-          <Text style={styles.unlockedPillText}>Unlocked</Text>
+        <View style={[styles.unlockedPill, (item as any).is_source_owner && { backgroundColor: 'rgba(0,255,102,0.2)' }]}>
+          <Ionicons name={(item as any).is_source_owner ? 'flash' : 'lock-open'} size={12} color="#00ff66" />
+          <Text style={styles.unlockedPillText}>
+            {(item as any).is_source_owner ? 'Your lead' : 'Unlocked'}
+          </Text>
         </View>
       </View>
       <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>

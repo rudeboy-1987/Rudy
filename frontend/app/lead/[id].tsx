@@ -252,6 +252,15 @@ export default function LeadDetail() {
           <Text style={styles.bottomHint}>Paid securely via PayPal. One-time fee.</Text>
         </View>
       )}
+
+      {lead.is_unlocked && (lead as any).is_source_owner && (
+        <View style={styles.bottomBar}>
+          <View style={[styles.unlockBtn, { backgroundColor: 'rgba(0,255,102,0.15)', borderWidth: 1, borderColor: '#00ff66' }]}>
+            <Ionicons name="flash" size={18} color="#00ff66" />
+            <Text style={[styles.unlockBtnText, { color: '#00ff66' }]}>This lead came in via your share link — full access free</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

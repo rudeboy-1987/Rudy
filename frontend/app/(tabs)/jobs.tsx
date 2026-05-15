@@ -212,9 +212,11 @@ export default function LeadsScreen() {
         </View>
 
         {item.is_unlocked && (
-          <View style={styles.unlockedBanner}>
-            <Ionicons name="checkmark-circle" size={14} color="#00ff66" />
-            <Text style={styles.unlockedText}>You unlocked this lead</Text>
+          <View style={[styles.unlockedBanner, (item as any).is_source_owner && { backgroundColor: 'rgba(0,255,102,0.15)' }]}>
+            <Ionicons name={(item as any).is_source_owner ? 'flash' : 'checkmark-circle'} size={14} color="#00ff66" />
+            <Text style={styles.unlockedText}>
+              {(item as any).is_source_owner ? 'Your lead — full access free' : 'You unlocked this lead'}
+            </Text>
           </View>
         )}
       </TouchableOpacity>

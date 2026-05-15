@@ -1689,9 +1689,12 @@ def mask_phone(phone: str) -> str:
 
 
 def serialize_lead(lead: dict, contractor_id: Optional[str] = None) -> dict:
-    """Return lead with masked contact info unless this contractor has unlocked it."""
+    """Return lead with masked contact info unless this contractor has unlocked it.
+    The contractor who brought in the lead (via their referral link) ALWAYS sees full details for free."""
     lead.pop("_id", None)
-    unlocked = bool(contractor_id and contractor_id in lead.get("unlocked_by", []))
+    is_source_owner = bool(contractor_id and lead.get("source_ref_user_id") == contractor_id)
+    has_paid_unlock = bool(contractor_id and contractor_id in lead.get("unlocked_by", []))
+    unlocked = is_source_owner or has_paid_unlock
     if not unlocked:
         lead["poster_email"] = mask_email(lead.get("poster_email", ""))
         lead["poster_phone"] = mask_phone(lead.get("poster_phone", ""))
@@ -1701,6 +1704,7 @@ def serialize_lead(lead: dict, contractor_id: Optional[str] = None) -> dict:
         if len(name) > 1:
             lead["poster_name"] = f"{name[0]} {name[-1][0]}."
     lead["is_unlocked"] = unlocked
+    lead["is_source_owner"] = is_source_owner  # this contractor brought in the lead via their share link
     lead["slots_remaining"] = max(0, lead.get("max_unlocks", 5) - len(lead.get("unlocked_by", [])))
     lead["unlock_count"] = len(lead.get("unlocked_by", []))
     return lead
@@ -1994,13 +1998,23 @@ async def leads_feed(
 
 @api_router.get("/leads/my-unlocked")
 async def my_unlocked_leads(current_user: dict = Depends(get_current_user)):
-    """Returns leads the current contractor has paid to unlock (with full contact info)."""
-    cursor = db.leads.find({"unlocked_by": current_user["id"]}).sort("updated_at", -1).limit(200)
-    leads_list = await cursor.to_list(200)
+    """Returns leads the current contractor has access to:
+    - leads they paid to unlock, OR
+    - leads they brought in via their own referral link (free access).
+    Both come back with full contact info."""
+    query = {
+        "$or": [
+            {"unlocked_by": current_user["id"]},
+            {"source_ref_user_id": current_user["id"]},
+        ]
+    }
+    cursor = db.leads.find(query).sort("created_at", -1).limit(500)
+    leads_list = await cursor.to_list(500)
     out = []
     for ld in leads_list:
         ld.pop("_id", None)
         ld["is_unlocked"] = True
+        ld["is_source_owner"] = ld.get("source_ref_user_id") == current_user["id"]
         ld["slots_remaining"] = max(0, ld.get("max_unlocks", 5) - len(ld.get("unlocked_by", [])))
         ld["unlock_count"] = len(ld.get("unlocked_by", []))
         out.append(ld)
@@ -2048,6 +2062,10 @@ async def create_lead_unlock_order(lead_id: str, http_request: Request, current_
     ld = await db.leads.find_one({"id": lead_id})
     if not ld:
         raise HTTPException(status_code=404, detail="Lead not found")
+
+    # Free access if you brought in the lead
+    if ld.get("source_ref_user_id") == current_user["id"]:
+        raise HTTPException(status_code=400, detail="You brought in this lead — contact info is already unlocked for you.")
 
     if current_user["id"] in ld.get("unlocked_by", []):
         raise HTTPException(status_code=400, detail="You have already unlocked this lead")
