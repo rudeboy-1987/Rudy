@@ -528,7 +528,19 @@ frontend:
         agent: "main"
         comment: "4 endpoints: POST /api/social/facebook/connect (validates token against graph.facebook.com, stores), GET /api/social/facebook/status, POST /api/social/facebook/disconnect, POST /api/social/facebook/post (posts message + link to Page feed). Bogus token returns 400 with Meta's OAuthException code 190 — validation works. User provides their own Page ID + Page Access Token via /connect-facebook UI."
 
-  test_sequence: 2
+  - task: "Material Prices — read/update/create/delete with timestamps"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /api/materials/prices now returns last_updated ISO timestamp for every row (backfilled 34 existing rows). New PUT /api/materials/prices/{id} updates name/price/unit/category/description and sets last_updated=now + updated_by=user. New POST /api/materials/prices creates a new entry. New DELETE /api/materials/prices/{id}. Frontend materials.tsx rewritten with tap-to-edit modal, long-press to delete, + button to create, and 'last updated X ago' on each card (green/bold if updated <1min ago). Smoke tested: backfill 34 rows, update wire price 85→99.99, create new 'USB-C Outlet' $42.50 — all 200 OK with proper timestamp."
+
+  test_sequence: 3
   run_ui: false
 
 test_plan:

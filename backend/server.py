@@ -1438,10 +1438,102 @@ SUBSCRIPTION_PACKAGES = {
 @api_router.get("/materials/prices")
 async def get_material_prices(category: Optional[str] = None):
     query = {"category": category} if category else {}
-    prices = await db.material_prices.find(query).to_list(500)
+    prices = await db.material_prices.find(query).sort("category", 1).to_list(500)
     for p in prices:
         p.pop("_id", None)
+        # Normalize timestamp field name and ensure it's serializable
+        ts = p.get("updated_at") or p.get("last_updated")
+        if isinstance(ts, datetime):
+            p["last_updated"] = ts.isoformat()
+        elif ts:
+            p["last_updated"] = str(ts)
+        else:
+            p["last_updated"] = None
+        p.pop("updated_at", None)
     return prices
+
+
+class MaterialPriceUpdate(BaseModel):
+    price: Optional[float] = None
+    name: Optional[str] = None
+    unit: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+
+
+@api_router.put("/materials/prices/{material_id}")
+async def update_material_price(
+    material_id: str,
+    update: MaterialPriceUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Allow contractors to update their local material prices."""
+    existing = await db.material_prices.find_one({"id": material_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    patch: Dict[str, Any] = {}
+    if update.price is not None:
+        if update.price < 0:
+            raise HTTPException(status_code=400, detail="Price must be non-negative")
+        patch["price"] = float(update.price)
+    if update.name is not None:
+        patch["name"] = update.name.strip()
+    if update.unit is not None:
+        patch["unit"] = update.unit.strip()
+    if update.description is not None:
+        patch["description"] = update.description.strip()
+    if update.category is not None:
+        patch["category"] = update.category.strip()
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    patch["last_updated"] = datetime.utcnow()
+    patch["updated_by"] = current_user["id"]
+    await db.material_prices.update_one({"id": material_id}, {"$set": patch})
+
+    updated = await db.material_prices.find_one({"id": material_id})
+    updated.pop("_id", None)
+    if isinstance(updated.get("last_updated"), datetime):
+        updated["last_updated"] = updated["last_updated"].isoformat()
+    return updated
+
+
+class MaterialPriceCreate(BaseModel):
+    name: str
+    category: str
+    unit: str
+    price: float
+    description: Optional[str] = None
+
+
+@api_router.post("/materials/prices")
+async def create_material_price(item: MaterialPriceCreate, current_user: dict = Depends(get_current_user)):
+    """Allow contractors to add a new material price to their database."""
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": item.name.strip(),
+        "category": item.category.strip().lower(),
+        "unit": item.unit.strip(),
+        "price": float(item.price),
+        "description": (item.description or "").strip(),
+        "last_updated": datetime.utcnow(),
+        "updated_by": current_user["id"],
+    }
+    await db.material_prices.insert_one(doc)
+    doc.pop("_id", None)
+    if isinstance(doc.get("last_updated"), datetime):
+        doc["last_updated"] = doc["last_updated"].isoformat()
+    return doc
+
+
+@api_router.delete("/materials/prices/{material_id}")
+async def delete_material_price(material_id: str, current_user: dict = Depends(get_current_user)):
+    result = await db.material_prices.delete_one({"id": material_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Material not found")
+    return {"success": True}
+
 
 @api_router.post("/materials/prices/seed")
 async def seed_material_prices():

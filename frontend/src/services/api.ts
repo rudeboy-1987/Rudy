@@ -92,6 +92,8 @@ export interface MaterialPrice {
   unit: string;
   price: number;
   description?: string;
+  last_updated?: string | null;
+  updated_by?: string;
 }
 
 // Estimates API
@@ -134,6 +136,11 @@ export const materialsApi = {
   getPrices: (category?: string) =>
     api.get<MaterialPrice[]>('/materials/prices', { params: { category } }),
   seedPrices: () => api.post('/materials/prices/seed'),
+  updatePrice: (id: string, data: Partial<MaterialPrice>) =>
+    api.put<MaterialPrice>(`/materials/prices/${id}`, data),
+  createPrice: (data: Omit<MaterialPrice, 'id' | 'last_updated' | 'updated_by'>) =>
+    api.post<MaterialPrice>('/materials/prices', data),
+  deletePrice: (id: string) => api.delete(`/materials/prices/${id}`),
 };
 
 // Jobs API
