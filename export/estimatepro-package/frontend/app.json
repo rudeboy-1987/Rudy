@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "EstimatePro",
+    "slug": "estimatepro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "estimatepro",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "description": "AI-powered electrical estimating, live leads, and blueprint vision for contractors.",
+    "primaryColor": "#00ff66",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.estimatepro.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#000000"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.estimatepro.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/icon.png",
+      "name": "EstimatePro",
+      "shortName": "EstimatePro",
+      "lang": "en",
+      "themeColor": "#00ff66",
+      "backgroundColor": "#0a0a0a",
+      "display": "standalone",
+      "orientation": "portrait",
+      "description": "AI-powered electrical estimating, live leads, and blueprint vision for contractors."
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "estimatepro"
+      }
+    }
+  }
+}
