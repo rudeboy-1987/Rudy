@@ -389,7 +389,7 @@ frontend:
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "POST /api/leads/verify/send sends 6-digit code via Twilio SMS or SendGrid email (with SMTP fallback). POST /api/leads/verify/check validates the code (expires in 10 min, max 5 attempts). When delivery not configured, returns dev_code in response body. Twilio creds wired (SID AC2661b7869bd70715f19d0aad4c820f64, number +18332428534). Email currently has no SendGrid/SMTP key so it falls back to dev_code mode."
+        comment: "POST /api/leads/verify/send sends 6-digit code via Twilio SMS or SendGrid email (with SMTP fallback). POST /api/leads/verify/check validates the code (expires in 10 min, max 5 attempts). When delivery not configured, returns dev_code in response body. Twilio creds wired (SID <YOUR_TWILIO_ACCOUNT_SID>, number +18332428534). Email currently has no SendGrid/SMTP key so it falls back to dev_code mode."
       - working: true
         agent: "testing"
         comment: "TESTED: All verification flows pass. POST /leads/verify/send with channel=email returns delivered=false, delivery_mode=email_not_configured, dev_code populated as expected (no SendGrid). channel=sms to a fake test number returns delivered=false, delivery_mode=twilio_failed, dev_code populated (Twilio rejects invalid number with 21211 — handled gracefully). Bad channel ('foo') → 400. POST /leads/verify/check: correct code returns success+verified, wrong code → 400, unknown id → 404, 6th wrong attempt → 429."

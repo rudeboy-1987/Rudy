@@ -92,8 +92,8 @@ mongorestore --uri="mongodb+srv://estimatepro_app:PASSWORD@estimatepro.xxxxx.mon
    | `PAYPAL_MODE` | `live` |
    | `PAYPAL_CLIENT_ID` | Your PayPal client ID |
    | `PAYPAL_CLIENT_SECRET` | Your PayPal client secret |
-   | `TWILIO_ACCOUNT_SID` | `AC2661b7869bd70715f19d0aad4c820f64` |
-   | `TWILIO_AUTH_TOKEN` | `b333b208995267a4860a9644a3b1de5f` |
+   | `TWILIO_ACCOUNT_SID` | `<YOUR_TWILIO_ACCOUNT_SID>` |
+   | `TWILIO_AUTH_TOKEN` | `<YOUR_TWILIO_AUTH_TOKEN>` |
    | `TWILIO_PHONE_NUMBER` | `+18332428534` |
    | `CORS_ORIGINS` | `https://donerightelectricltd.com,https://www.donerightelectricltd.com` |
 

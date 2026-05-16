@@ -6,7 +6,7 @@
 - Referral code: ZQA5QA
 
 ## Twilio (configured in backend/.env)
-- Account SID: AC2661b7869bd70715f19d0aad4c820f64
+- Account SID: <YOUR_TWILIO_ACCOUNT_SID>
 - Phone Number: +18332428534
 
 ## SendGrid (NOT configured)

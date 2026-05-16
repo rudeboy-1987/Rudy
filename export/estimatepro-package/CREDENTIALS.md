@@ -7,8 +7,8 @@ This is a complete list of every credential currently configured in your Emergen
 ---
 
 ## 1. 📞 Twilio (SMS verification)
-- **Account SID:** `AC2661b7869bd70715f19d0aad4c820f64`
-- **Auth Token:** `b333b208995267a4860a9644a3b1de5f`
+- **Account SID:** `<YOUR_TWILIO_ACCOUNT_SID>`
+- **Auth Token:** `<YOUR_TWILIO_AUTH_TOKEN>`
 - **Phone Number:** `+18332428534`
 - **Console:** https://console.twilio.com
 - **What it powers:** SMS verification codes for the post-lead form (homeowner phone verification).
@@ -85,7 +85,7 @@ This is a complete list of every credential currently configured in your Emergen
 ---
 
 ## 8. 🚀 Expo (Mobile native build, when ready) — Token set
-- **EXPO_TOKEN:** `Tr4ZfR-_wQfR8iIuwXVlaeIggluoMdJ5e32KIR7X`
+- **EXPO_TOKEN:** `<YOUR_EXPO_TOKEN>`
 - **Dashboard:** https://expo.dev
 - **What it powers:** EAS Build (for compiling .ipa / .aab for App Store / Play Store later)
 - **Action needed (only if you want a native app later):** Install EAS CLI on your machine → run `eas login` → `eas build --platform all`
