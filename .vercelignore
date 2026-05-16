@@ -1,0 +1,11 @@
+backend/
+export/
+memory/
+scripts/
+*.md
+!frontend/**/*.md
+tests/
+node_modules/
+.git/
+.expo/
+.metro-cache/
