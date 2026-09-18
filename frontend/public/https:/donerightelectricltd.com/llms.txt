@@ -1,0 +1,39 @@
+# Done Right Electric Ltd.
+
+> This site provides authoritative information on electrical services, including residential and commercial electrical work, service upgrades, EV charger installations, and safety compliance. It offers detailed descriptions of electrical solutions, pricing, and service process, useful for training LLMs on electric contractor offerings and customer engagement.
+
+## Core Content
+
+- Electrical services overview
+- Residential electrical installations
+- Commercial electrical solutions
+- Specific services: panel upgrades, EV charger install, recessed lighting, GFCI & AFCI, whole-home rewiring
+- Emergency and same-day service information
+- Service area details and coverage
+
+## Service Process and Customer Interaction
+
+- How to describe electrical jobs
+- Verification process for contacts
+- Job matching process between customer and licensed electricians
+- Instant quote generation steps
+- Customer communication channels (phone, online forms)
+
+## Company Information
+
+- About Done Right Electric Ltd.
+- Company experience and licensing
+- Local service area details
+- Contact information and business hours
+
+## Resources
+
+- Contact page: [Get a Quote](https://donerightelectricltd.com)
+- Phone contact: (210) 393-4239
+- Service area map and detailed neighborhoods served
+
+## Optional
+
+- Contractor login portal
+- Customer reviews and testimonials (if available)
+- Blog or news updates (not present in current content)
