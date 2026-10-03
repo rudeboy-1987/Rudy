@@ -243,7 +243,7 @@ export default function PostLeadScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.refTitle}>Sent via {referralCompany}</Text>
                 <Text style={styles.refSubtitle}>
-                  Your job will be visible to {referralCompany} and up to 4 other verified electricians in your area.
+                  Your request goes straight to {referralCompany} — it's private and never shared with other contractors.
                 </Text>
               </View>
             </View>
@@ -541,9 +541,11 @@ export default function PostLeadScreen() {
               <View style={styles.successIcon}>
                 <Ionicons name="checkmark" size={60} color="#000" />
               </View>
-              <Text style={styles.successTitle}>Lead posted!</Text>
+              <Text style={styles.successTitle}>Request sent!</Text>
               <Text style={styles.sectionHint}>
-                Up to 5 local electricians will reach out shortly. We'll never share your contact info with anyone else.
+                {referralCompany
+                  ? `${referralCompany} will reach out shortly. Your request is private — only they see your contact info.`
+                  : `We'll reach out shortly. Your contact info stays private and is never shared.`}
               </Text>
               <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/(auth)/login')}>
                 <Text style={styles.primaryBtnText}>Done</Text>

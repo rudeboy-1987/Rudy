@@ -1749,6 +1749,59 @@ def send_email_via_sendgrid(to_email: str, subject: str, html_body: str) -> bool
         return False
 
 
+def notify_contractor_of_direct_lead(ref_user: dict, lead: dict) -> None:
+    """Email + SMS the contractor when a homeowner submits a quote request
+    through their referral link (e.g. the "Get a free quote" button on their
+    website). Direct leads are private — never listed in the shared feed.
+    Never raises: a notification failure must not break the lead submission."""
+    try:
+        company = (ref_user.get("company_name") or "your company").strip()
+        detail_lines = [
+            f"Name: {lead.get('poster_name')}",
+            f"Phone: {lead.get('poster_phone')}",
+            f"Email: {lead.get('poster_email')}",
+            f"Location: {lead.get('city')}, {lead.get('state')} {lead.get('zip_code')}",
+            f"Project: {lead.get('title')}",
+            f"Details: {lead.get('description')}",
+            f"Budget: ${lead.get('estimated_budget')}",
+            f"Urgency: {lead.get('urgency')}",
+        ]
+        text_body = (
+            f"New DIRECT lead for {company} (private — not in the marketplace):\n\n"
+            + "\n".join(detail_lines)
+        )
+        html_body = (
+            f"<h3>New DIRECT lead for {company}</h3>"
+            f"<p><i>Private — not listed in the marketplace.</i></p>"
+            f"<p>" + "<br>".join(detail_lines) + "</p>"
+        )
+        subject = f"New direct lead: {lead.get('title')}"
+
+        dest_email = (ref_user.get("email") or "").strip()
+        if dest_email:
+            if not send_email_via_sendgrid(dest_email, subject, html_body):
+                send_email_via_smtp(dest_email, subject, text_body)
+
+        dest_phone = (ref_user.get("phone") or "").strip()
+        sid = os.environ.get("TWILIO_ACCOUNT_SID")
+        token = os.environ.get("TWILIO_AUTH_TOKEN")
+        from_num = os.environ.get("TWILIO_PHONE_NUMBER")
+        if dest_phone and TWILIO_AVAILABLE and sid and token and from_num:
+            digits = "".join(c for c in dest_phone if c.isdigit() or c == "+")
+            if not digits.startswith("+"):
+                digits = "+1" + digits if len(digits) == 10 else "+" + digits
+            TwilioClient(sid, token).messages.create(
+                body=(
+                    f"New direct lead ({company}): {lead.get('poster_name')} — "
+                    f"{lead.get('poster_phone')}. {lead.get('title')}"
+                ),
+                from_=from_num,
+                to=digits,
+            )
+    except Exception as e:
+        logger.error(f"Direct-lead notification failed: {e}")
+
+
 # --- Verification endpoints (email + SMS) ---
 
 @api_router.post("/leads/verify/send")
@@ -1895,11 +1948,16 @@ async def post_lead(lead: LeadCreate):
 
     # Track referral attribution if provided
     source_ref_user_id = None
+    ref_user = None
     if lead.referral_code:
         ref_user = await db.users.find_one({"referral_code": lead.referral_code.upper().strip()})
         if ref_user:
             source_ref_user_id = ref_user["id"]
 
+    # Leads that arrive through a contractor's referral link (e.g. the
+    # "Get a free quote" button on their own website) are DIRECT: private to
+    # that contractor, never listed in the shared feed, never unlockable.
+    is_direct = bool(source_ref_user_id)
     lead_doc = {
         "id": str(uuid.uuid4()),
         "poster_name": lead.poster_name.strip(),
@@ -1923,8 +1981,8 @@ async def post_lead(lead: LeadCreate):
         "address": (lead.address or "").strip() or None,
         "images": lead.images or [],
         "unlocked_by": [],
-        "max_unlocks": 5,
-        "status": "open",  # open, locked (5 unlocks reached), closed
+        "max_unlocks": 0 if is_direct else 5,
+        "status": "direct" if is_direct else "open",  # open, locked (5 unlocks reached), closed, direct (private)
         "source_ref_user_id": source_ref_user_id,
         "source_ref_code": (lead.referral_code or "").upper() or None,
         "created_at": datetime.utcnow(),
@@ -1932,12 +1990,20 @@ async def post_lead(lead: LeadCreate):
     }
     await db.leads.insert_one(lead_doc)
     lead_doc.pop("_id", None)
+
+    if is_direct and ref_user:
+        # Private lead: notify the contractor directly, keep it out of the feed.
+        notify_contractor_of_direct_lead(ref_user, lead_doc)
+        company = (ref_user.get("company_name") or "the contractor").strip()
+        message = f"Request received! {company} will contact you shortly."
+    else:
+        message = "Lead posted successfully. Local contractors will be notified."
     return {
         "success": True,
         "lead_id": lead_doc["id"],
         "lead_price": pricing["price"],
         "tier": pricing["tier"],
-        "message": "Lead posted successfully. Local contractors will be notified.",
+        "message": message,
     }
 
 
@@ -2063,6 +2129,10 @@ async def create_lead_unlock_order(lead_id: str, http_request: Request, current_
     if not ld:
         raise HTTPException(status_code=404, detail="Lead not found")
 
+    # Direct (private) leads are never unlockable — they belong to one contractor.
+    if ld.get("status") != "open":
+        raise HTTPException(status_code=400, detail="This lead is private and cannot be unlocked.")
+
     # Free access if you brought in the lead
     if ld.get("source_ref_user_id") == current_user["id"]:
         raise HTTPException(status_code=400, detail="You brought in this lead — contact info is already unlocked for you.")
@@ -2140,6 +2210,10 @@ async def capture_lead_unlock(
     ld = await db.leads.find_one({"id": lead_id})
     if not ld:
         raise HTTPException(status_code=404, detail="Lead not found")
+
+    # Direct (private) leads are never unlockable — they belong to one contractor.
+    if ld.get("status") != "open":
+        raise HTTPException(status_code=400, detail="This lead is private and cannot be unlocked.")
 
     if not configure_paypal():
         raise HTTPException(status_code=500, detail="PayPal not configured")
