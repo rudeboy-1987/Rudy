@@ -162,7 +162,7 @@ export default function Landing() {
           <View style={styles.stepsList}>
             <Step n="1" title="Describe your job" desc="Outlets, lighting, panel upgrade, EV charger — anything electrical. Snap a photo if you have one." />
             <Step n="2" title="Verify your contact" desc="Quick email + phone verification so we know you're real (takes 30 seconds)." />
-            <Step n="3" title="Get matched" desc={`${BRAND.short} + up to 4 other licensed pros see your job and contact you within minutes.`} />
+            <Step n="3" title="Get your quote" desc={`Your request goes straight to ${BRAND.short} — private, never shared with other contractors. We usually respond within minutes.`} />
           </View>
         </View>
 
