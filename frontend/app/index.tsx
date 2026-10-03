@@ -25,7 +25,7 @@ const BRAND = {
   email: 'contact@donerightelectricltd.com',
   years: '18+',
   city: 'San Antonio, TX',
-  refCode: 'ZQA5QA',
+  refCode: 'ASZAUJ',
 };
 
 const SERVICES = [
