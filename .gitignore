@@ -225,3 +225,6 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Metro bundler cache (never commit)
+.metro-cache/
