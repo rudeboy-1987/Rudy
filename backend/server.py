@@ -1712,10 +1712,13 @@ def serialize_lead(lead: dict, contractor_id: Optional[str] = None) -> dict:
 
 def send_email_via_smtp(to_email: str, subject: str, body: str) -> bool:
     """Fallback email sender via SMTP if SendGrid is not configured."""
-    smtp_user = os.environ.get('SMTP_USER')
-    smtp_pass = os.environ.get('SMTP_PASS')
-    smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
-    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+    smtp_user = (os.environ.get('SMTP_USER') or '').strip()
+    smtp_pass = (os.environ.get('SMTP_PASS') or '').replace(' ', '').strip()
+    smtp_host = (os.environ.get('SMTP_HOST') or 'smtp.gmail.com').strip() or 'smtp.gmail.com'
+    try:
+        smtp_port = int((os.environ.get('SMTP_PORT') or '587').strip() or '587')
+    except ValueError:
+        smtp_port = 587
     if not smtp_user or not smtp_pass:
         return False
     try:
