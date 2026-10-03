@@ -62,7 +62,7 @@ export default function Root({ children }: PropsWithChildren) {
               description:
                 "San Antonio's trusted electrical contractor — panel upgrades, EV chargers, GFCI, recessed lighting, commercial & residential. 18+ years experience.",
               url: "https://donerightelectricltd.com",
-              telephone: "+1-210-393-4239",
+              telephone: "+1-210-775-0331",
               image: "https://donerightelectricltd.com/icon-512.png",
               priceRange: "$$",
               address: {
